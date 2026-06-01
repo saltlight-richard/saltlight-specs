@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaltLight Specs</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f7f9fc;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --text-main: #1a202c;
+  --text-muted: #4a5568;
+  --text-subtle: #718096;
+  --accent: #2c4f7a;
+  --accent-light: #4d9ef8;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --status-active-bg: #dcfce7;
+  --status-active-text: #166534;
+  --status-backlog-bg: #fef3c7;
+  --status-backlog-text: #854d0e;
+  --status-finished-bg: #e0e7ff;
+  --status-finished-text: #3730a3;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-main);
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+header {
+  background: #ffffff;
+  border-bottom: 1px solid var(--card-border);
+  padding: 24px 32px;
+}
+
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+}
+
+header p {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.section {
+  margin-bottom: 48px;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.section-header h2 {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.section-count {
+  font-size: 13px;
+  color: var(--text-subtle);
+  font-weight: 500;
+}
+
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.spec-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 20px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+  box-shadow: var(--shadow);
+}
+
+.spec-card:hover {
+  box-shadow: var(--shadow-hover);
+  border-color: var(--accent-light);
+  transform: translateY(-1px);
+}
+
+.spec-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.spec-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+
+.status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-active { background: var(--status-active-bg); color: var(--status-active-text); }
+.status-backlog { background: var(--status-backlog-bg); color: var(--status-backlog-text); }
+.status-finished { background: var(--status-finished-bg); color: var(--status-finished-text); }
+
+.spec-card-description {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.spec-card-meta {
+  font-size: 12px;
+  color: var(--text-subtle);
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.spec-card-meta .dot {
+  width: 3px;
+  height: 3px;
+  background: var(--text-subtle);
+  border-radius: 50%;
+}
+
+.empty-state {
+  background: var(--card-bg);
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-subtle);
+}
+
+footer {
+  text-align: center;
+  padding: 32px;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <h1>SaltLight Specs</h1>
+    <p>Canonical spec content for the SaltLight rebuild. Status reflects build state, not workflow assignment (see Trello for that).</p>
+  </div>
+</header>
+
+<main>
+  <div class="section">
+    <div class="section-header">
+      <h2>Active</h2>
+      <span class="section-count" id="count-active">0 specs</span>
+    </div>
+    <div class="spec-grid" id="grid-active"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>Backlog</h2>
+      <span class="section-count" id="count-backlog">0 specs</span>
+    </div>
+    <div class="spec-grid" id="grid-backlog"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>Finished</h2>
+      <span class="section-count" id="count-finished">0 specs</span>
+    </div>
+    <div class="spec-grid" id="grid-finished"></div>
+  </div>
+</main>
+
+<footer>
+  Generated for the SaltLight rebuild. Last updated 2026-06-01.
+</footer>
+
+<script>
+const SPECS = [
+  {
+    title: "Multi-Selection Routing",
+    description: "Priority-only routing model for connect cards with multiple selections. Defines how SaltLight chooses which leader is notified.",
+    href: "specs/multi-selection-routing.html",
+    status: "active",
+    owner: "Kenneth",
+    updated: "2026-06-01"
+  },
+  {
+    title: "Rock RMS Integration",
+    description: "Backend integration with Rock RMS for accounts, groups, workflows, and connection requests.",
+    href: "specs/rock-rms.html",
+    status: "active",
+    owner: "Kenneth",
+    updated: "2026-05-27"
+  }
+];
+
+const STATUS_LABELS = {
+  active: "Active",
+  backlog: "Backlog",
+  finished: "Finished"
+};
+
+function renderSpecs() {
+  const grids = {
+    active: document.getElementById("grid-active"),
+    backlog: document.getElementById("grid-backlog"),
+    finished: document.getElementById("grid-finished")
+  };
+  const counts = { active: 0, backlog: 0, finished: 0 };
+
+  for (const spec of SPECS) {
+    counts[spec.status] = (counts[spec.status] || 0) + 1;
+
+    const card = document.createElement("a");
+    card.className = "spec-card";
+    card.href = spec.href;
+
+    card.innerHTML = `
+      <div class="spec-card-header">
+        <div class="spec-card-title">${spec.title}</div>
+        <span class="status-badge status-${spec.status}">${STATUS_LABELS[spec.status]}</span>
+      </div>
+      <div class="spec-card-description">${spec.description}</div>
+      <div class="spec-card-meta">
+        <span>Owner: ${spec.owner}</span>
+        <span class="dot"></span>
+        <span>Updated ${spec.updated}</span>
+      </div>
+    `;
+
+    grids[spec.status].appendChild(card);
+  }
+
+  for (const status of ["active", "backlog", "finished"]) {
+    const count = counts[status];
+    document.getElementById(`count-${status}`).textContent = `${count} spec${count === 1 ? "" : "s"}`;
+    if (count === 0) {
+      grids[status].innerHTML = `<div class="empty-state">No specs in ${STATUS_LABELS[status].toLowerCase()}.</div>`;
+    }
+  }
+}
+
+renderSpecs();
+</script>
+
+</body>
+</html>

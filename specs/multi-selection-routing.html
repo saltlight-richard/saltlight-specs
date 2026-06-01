@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Selection Routing — SaltLight Specs</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 260px;
+  --topbar-h: 52px;
+  --sidebar-bg: #1e2a38;
+  --sidebar-text: #c8d3df;
+  --sidebar-hover: #2c3e52;
+  --sidebar-active-border: #4d9ef8;
+  --sidebar-active-bg: #243447;
+  --sidebar-active-text: #ffffff;
+  --sidebar-h2-text: #94a9be;
+  --sidebar-h2-hover: #b8c9d8;
+  --topbar-bg: #ffffff;
+  --topbar-border: #e2e8f0;
+  --content-bg: #ffffff;
+  --text-main: #1a202c;
+  --text-muted: #4a5568;
+  --accent: #2c4f7a;
+  --accent-light: #4d9ef8;
+  --code-bg: #f5f7fa;
+  --code-border: #dde3eb;
+  --code-text: #2d3748;
+  --inline-code-bg: #f0f2f5;
+  --inline-code-text: #9b2335;
+  --table-header-bg: #2c4f7a;
+  --table-row-alt: #f7f9fc;
+  --blockquote-border: #4d9ef8;
+  --blockquote-bg: #f0f6ff;
+  --hr-color: #e2e8f0;
+  --status-active-bg: #dcfce7;
+  --status-active-text: #166534;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-main);
+  background: var(--content-bg);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--topbar-h);
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px 0 calc(var(--sidebar-w) + 20px);
+  z-index: 100;
+  gap: 12px;
+}
+
+#topbar a.back-link {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+#topbar a.back-link:hover { background: #f0f2f5; color: var(--accent); }
+
+#topbar .brand {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+#topbar .sep {
+  color: #cbd5e0;
+  font-size: 16px;
+}
+
+#topbar .current-section {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+#topbar .status-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--status-active-bg);
+  color: var(--status-active-text);
+  flex-shrink: 0;
+}
+
+#sidebar {
+  position: fixed;
+  top: var(--topbar-h);
+  left: 0;
+  width: var(--sidebar-w);
+  height: calc(100vh - var(--topbar-h));
+  background: var(--sidebar-bg);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #2c3e52 transparent;
+  z-index: 90;
+  padding: 12px 0 24px 0;
+}
+
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: #2c3e52; border-radius: 2px; }
+
+#sidebar .sidebar-brand {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-w);
+  height: var(--topbar-h);
+  background: #182230;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  z-index: 91;
+  border-bottom: 1px solid #0f1822;
+}
+
+#sidebar .sidebar-brand a {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.nav-section {
+  margin-bottom: 2px;
+}
+
+.nav-section-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--sidebar-text);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s, color 0.12s;
+  border-left: 3px solid transparent;
+  user-select: none;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.nav-section-header:hover {
+  background: var(--sidebar-hover);
+  color: #e8edf2;
+}
+
+.nav-section-header.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text);
+  border-left-color: var(--sidebar-active-border);
+}
+
+.nav-section-index {
+  font-size: 11px;
+  color: #4d6a85;
+  margin-right: 8px;
+  font-weight: 600;
+  min-width: 16px;
+  flex-shrink: 0;
+}
+
+.nav-section-header.active .nav-section-index {
+  color: #7ab8f5;
+}
+
+.nav-subitems {
+  display: none;
+  flex-direction: column;
+  padding: 0 0 4px 0;
+}
+
+.nav-subitems.open { display: flex; }
+
+.nav-subitem {
+  display: block;
+  padding: 5px 16px 5px 38px;
+  font-size: 12px;
+  color: var(--sidebar-h2-text);
+  cursor: pointer;
+  line-height: 1.35;
+  transition: color 0.1s, background 0.1s;
+  border-left: 3px solid transparent;
+  text-decoration: none;
+}
+
+.nav-subitem:hover {
+  color: var(--sidebar-h2-hover);
+  background: rgba(255,255,255,0.04);
+}
+
+#content-wrap {
+  margin-left: var(--sidebar-w);
+  margin-top: var(--topbar-h);
+  height: calc(100vh - var(--topbar-h));
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--content-bg);
+  scroll-behavior: smooth;
+}
+
+#content {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 48px 80px 48px;
+}
+
+#content h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 0;
+  margin-bottom: 20px;
+  line-height: 1.25;
+  border-bottom: 2px solid var(--hr-color);
+  padding-bottom: 12px;
+}
+
+#content h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 36px;
+  margin-bottom: 12px;
+  line-height: 1.3;
+  scroll-margin-top: calc(var(--topbar-h) + 20px);
+}
+
+#content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-top: 28px;
+  margin-bottom: 8px;
+  line-height: 1.35;
+  scroll-margin-top: calc(var(--topbar-h) + 20px);
+}
+
+#content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-top: 20px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#content p { margin-bottom: 14px; color: var(--text-main); }
+#content ul, #content ol { margin: 0 0 14px 0; padding-left: 24px; }
+#content li { margin-bottom: 5px; line-height: 1.6; }
+#content li > ul, #content li > ol { margin-top: 4px; margin-bottom: 0; }
+
+#content strong { color: var(--text-main); font-weight: 600; }
+#content em { font-style: italic; }
+
+#content code {
+  font-family: "Courier New", "Consolas", "Monaco", monospace;
+  font-size: 13px;
+  background: var(--inline-code-bg);
+  color: var(--inline-code-text);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+#content pre {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  margin: 14px 0 18px 0;
+}
+
+#content pre code {
+  font-family: "Courier New", "Consolas", "Monaco", monospace;
+  font-size: 13px;
+  background: none;
+  color: var(--code-text);
+  padding: 0;
+  border-radius: 0;
+  white-space: pre;
+  line-height: 1.55;
+}
+
+#content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 20px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#content thead tr {
+  background: var(--table-header-bg);
+  color: #ffffff;
+}
+
+#content thead th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+#content tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hr-color);
+  vertical-align: top;
+}
+
+#content tbody tr:nth-child(even) { background: var(--table-row-alt); }
+
+#content blockquote {
+  border-left: 4px solid var(--blockquote-border);
+  background: var(--blockquote-bg);
+  padding: 12px 16px;
+  margin: 14px 0;
+  color: var(--text-muted);
+}
+
+#content hr {
+  border: none;
+  border-top: 1px solid var(--hr-color);
+  margin: 32px 0;
+}
+
+/* Checkbox list items (read-only) */
+#content li.task-list-item {
+  list-style: none;
+  margin-left: -24px;
+  padding-left: 28px;
+  position: relative;
+}
+
+#content li.task-list-item::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #cbd5e0;
+  border-radius: 3px;
+  background: #ffffff;
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="sidebar-brand">
+    <a href="../index.html">SaltLight Specs</a>
+  </div>
+  <nav id="nav"></nav>
+</div>
+
+<div id="topbar">
+  <a href="../index.html" class="back-link">← All specs</a>
+  <span class="brand">Multi-Selection Routing</span>
+  <span class="sep">/</span>
+  <span class="current-section" id="current-section">Overview</span>
+  <span class="status-pill">Active</span>
+</div>
+
+<div id="content-wrap">
+  <div id="content"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<script>
+const SPEC_MD = String.raw`# Multi-Selection Routing — Priority-Only Model
+
+**Version:** 1.0
+**Date:** 2026-06-01
+**Status:** Ready for implementation
+
+---
+
+## Overview
+
+When a guest submits a connect card, SaltLight determines which leader(s) receive follow-up assignments. This spec defines exactly how that routing decision is made based on how many selections the guest made on their card.
+
+The goal: no guest is ever silently dropped, no leader is ever notified twice for the same guest, and no admin is ever asked to make a routing decision that the system can resolve on its own.
+
+Every leader who receives a guest — regardless of routing path — always gets the same two-message sequence:
+
+- **Message 1 — Context only:** Guest's full name, every selection they made on the card, any prayer request, and any open-field content. No suggested reply. No options.
+- **Message 2 — AI-generated suggested reply + options:** AI synthesizes a reply from the full guest context. Options: SEND / NO (redraft) / @ (write your own). The reply is generated fresh — never pulled verbatim from the CareFlow template.
+
+---
+
+## Rule 1 — Single Selection
+
+### The Rule
+
+If a guest makes exactly one selection and it matches a CareFlow, that CareFlow fires directly. Priority ranking logic is not involved.
+
+### User Story
+
+As a church leader, when a guest submits a connect card with one selection that matches my CareFlow, I want to receive two messages — first a context message telling me who the guest is and what they selected, then a second message with a suggested reply I can send, edit, or replace — so I can follow up with full situational awareness and no guesswork.
+
+### User Journey
+
+1. SaltLight receives a confirmed card for a guest who made one selection: "I'm new here."
+2. System matches "I'm new here" to the New Guest CareFlow.
+3. System creates one \`interaction\` record (New Guest CareFlow, status: \`initial\`).
+4. EventBridge schedules first message delivery within the CareFlow's configured send window.
+5. Leader receives Message 1: guest name, selection ("I'm new here"), prayer request if any, open-field content if any.
+6. Leader receives Message 2: AI-generated suggested reply + SEND / NO / @.
+7. Leader sends or edits the reply. Guest receives the message.
+
+### Acceptance Criteria
+
+- [ ] A guest with exactly one selection matching one CareFlow triggers that CareFlow to fire directly.
+- [ ] Priority ranking is not evaluated for single-selection guests.
+- [ ] One \`interaction\` record is created for the matched CareFlow.
+- [ ] Leader receives Message 1 and Message 2 as two separate messages (never combined).
+- [ ] Message 1 includes: guest name, the selection made, prayer request (if any), open-field content (if any).
+- [ ] Message 2 includes an AI-generated reply — not the verbatim CareFlow template — and options: SEND / NO / @.
+
+---
+
+## Rule 2 — Multi-Selection and Priority Ranking
+
+### The Rule
+
+If a guest makes more than one selection, priority ranking always applies. Every active CareFlow must have a unique priority rank. The matching CareFlow with the lowest rank number fires as the priority winner. CareFlows that matched but did not win priority — and do not have the always-fire flag — do not fire. The guest is handled by the priority winner.
+
+If none of the guest's selections match any configured CareFlow, the catch-all CareFlow fires and logs the guest. This is the safety net for unique or unexpected connect cards — selections that fall outside whatever the church has currently configured. No card ever comes in without somewhere to go. If no catch-all is configured, the admin is notified with a proposed action.
+
+### Priority Ranking Requirements
+
+- Every active CareFlow must have a unique priority rank before it can go active. A CareFlow without a rank cannot be activated.
+- Ranks are positive integers (1, 2, 3... N). Rank 1 is highest priority.
+- No two CareFlows in the same account can share the same rank number.
+- There is no cap — a church with 20 CareFlows will have ranks 1 through 20.
+- New accounts are pre-populated with: Accepted Christ at rank 1, New Guest at rank 2.
+
+### User Story
+
+As a church leader whose CareFlow is the highest priority match for a guest who checked multiple boxes, I want to receive one two-message sequence that gives me context on everything the guest selected — not just the selection that matched my CareFlow — so I can have a fully informed conversation with them.
+
+### User Journey
+
+1. SaltLight receives a confirmed card for a guest who made two selections: "I'm new here" and "Interested in baptism."
+2. System finds two matching CareFlows: New Guest (rank 1) and Baptism Interest (rank 3). Neither has always-fire enabled.
+3. New Guest wins (lowest rank number). Only New Guest fires. Baptism Interest does not create an interaction record.
+4. System creates one \`interaction\` record for New Guest CareFlow.
+5. Pastor Mike (New Guest primary leader) receives Message 1: guest name, all selections ("I'm new here" and "Interested in baptism"), prayer request if any.
+6. Pastor Mike receives Message 2: AI-generated reply synthesizing both selections.
+7. Guest receives follow-up from Pastor Mike. No one from Baptism Interest is notified.
+
+### Acceptance Criteria
+
+- [ ] A guest with two or more selections triggers priority ranking logic.
+- [ ] A CareFlow cannot be set to active if \`priority_rank\` is null. API returns 400: "A priority rank is required before activating a CareFlow."
+- [ ] No two CareFlows in the same account can share the same \`priority_rank\`. API returns 409: "Rank [N] is already assigned to [CareFlow Name]. Please choose a different rank."
+- [ ] \`priority_rank\` uniqueness is enforced at the database level (partial unique index scoped to account).
+- [ ] New accounts are pre-populated with Accepted Christ at rank 1 and New Guest at rank 2.
+- [ ] System evaluates all active CareFlows whose mapped selections match any of the guest's selections.
+- [ ] The matching CareFlow with the lowest \`priority_rank\` fires as the priority winner.
+- [ ] CareFlows that matched but did not win priority — and do not have \`always_fire = true\` — do not fire. The guest is still handled by the priority winner.
+- [ ] If none of the guest's selections match any configured CareFlow and no always-fire CareFlow applies, the catch-all CareFlow fires and creates an \`interaction\` record. No card is ever left without a destination.
+- [ ] If no catch-all is configured and no CareFlow matches, the admin is notified with a proposed action.
+- [ ] One \`interaction\` record is created for the priority winner.
+- [ ] Priority winner's leader receives Message 1 and Message 2.
+- [ ] Message 1 includes ALL of the guest's selections — not just the one that matched this CareFlow — plus prayer request and open-field content.
+- [ ] \`GET /workflow/list\` returns \`priority_rank\` and \`always_fire\` for each workflow.
+
+---
+
+## Rule 3 — Always-Fire Flag
+
+### The Rule
+
+A boolean flag on each CareFlow (\`always_fire\`, default \`false\`). When enabled, that CareFlow fires alongside the priority winner whenever its selection is matched on a multi-selection card — regardless of its rank position.
+
+This is intended for CareFlows where the church wants guaranteed notification no matter which CareFlow wins priority. SaltLight displays advisory copy near this setting: "Enabling this means this leader will always be notified when their selection is matched, even when another CareFlow takes priority. We recommend keeping this off unless you have a specific reason to notify multiple leaders."
+
+### User Story
+
+As a church leader whose CareFlow has the always-fire flag enabled, I want to be notified whenever my selection is matched — even when another CareFlow has higher priority — because my role requires me to always follow up with guests in my area regardless of what other leaders are doing.
+
+### User Journey
+
+1. SaltLight receives a confirmed card for a guest who made two selections: "Accepted Christ" and "I'm new here."
+2. System finds two matching CareFlows: Accepted Christ (rank 1), New Guest (rank 2, always-fire enabled).
+3. Accepted Christ wins priority. New Guest also fires due to the always-fire flag.
+4. Accepted Christ is assigned to Pastor Sarah. New Guest is assigned to the Guest Services leader. Different leaders — no deduplication needed.
+5. System creates two \`interaction\` records (one per CareFlow).
+6. Pastor Sarah receives Message 1 + Message 2 (full context of both selections).
+7. Guest Services leader receives Message 1 + Message 2 (full context of both selections).
+8. Guest receives follow-up from whichever leader acts first.
+
+### Acceptance Criteria
+
+- [ ] A CareFlow with \`always_fire = true\` fires alongside the priority winner whenever its selection is matched on a multi-selection card.
+- [ ] An \`interaction\` record is created for each always-fire CareFlow that fires.
+- [ ] The always-fire CareFlow's assigned leader receives Message 1 and Message 2.
+- [ ] Always-fire CareFlows that did NOT match any of the guest's selections do not fire.
+- [ ] \`always_fire\` defaults to \`false\` on new CareFlow creation.
+- [ ] If the always-fire CareFlow is also the priority winner, it fires once — the flag has no additional effect on the winning CareFlow.
+
+---
+
+## Rule 4 — Leader Deduplication
+
+### The Rule
+
+Before any messages are sent, the system groups all matched CareFlows (priority winner + any always-fire matches) by their assigned leader. If two or more CareFlows share the same primary leader, that leader receives exactly one two-message sequence — not one per CareFlow. Interaction records are still created for every matched CareFlow.
+
+### User Story
+
+As a church leader assigned to multiple CareFlows, when a guest's selections match more than one of my CareFlows, I want to receive only one set of messages — not one per CareFlow — so I am not confused by duplicate notifications about the same guest.
+
+### User Journey
+
+1. SaltLight receives a confirmed card for a guest who made two selections: "Accepted Christ" and "I'm new here."
+2. Both Accepted Christ (rank 1) and New Guest (rank 2, always-fire enabled) match.
+3. Both CareFlows are assigned to Pastor Mike — same primary leader.
+4. System detects the shared leader and deduplicates.
+5. System creates two \`interaction\` records (one per CareFlow) for tracking purposes.
+6. Pastor Mike receives one Message 1: full context of both selections.
+7. Pastor Mike receives one Message 2: AI-generated reply synthesized from both selections, using the priority winner's CareFlow template as the primary voice and tone reference.
+8. Pastor Mike is not notified twice.
+
+### User Story — Guest Perspective
+
+As a guest who checks multiple boxes on a connect card, I want to receive follow-up from the right leader(s) and have that leader know everything I indicated on my card — so my follow-up feels personal and I don't need to repeat myself.
+
+### Acceptance Criteria
+
+- [ ] If the priority winner and one or more always-fire CareFlows share the same primary assigned leader, that leader receives exactly one Message 1 and one Message 2.
+- [ ] Deduplication is based on \`workflow_to_person_primary\` leader assignment.
+- [ ] The single Message 1 includes full context of all the guest's selections.
+- [ ] The single Message 2 is AI-generated from the combined context, using the priority winner's CareFlow template as the primary voice reference.
+- [ ] Interaction records are created for all matched CareFlows even when messages are deduplicated.
+
+---
+
+## No-Match and Catch-All
+
+If no active CareFlow matches any of the guest's selections:
+
+- If a catch-all CareFlow is configured: guest is silently enrolled in the catch-all. Leader receives the two-message sequence.
+- If no catch-all is configured: admin receives a notification with SaltLight's proposed action and the ability to confirm or adjust.
+
+### Acceptance Criteria
+
+- [ ] If no CareFlow matches and a catch-all is configured, the guest is silently enrolled in the catch-all and the two-message sequence fires.
+- [ ] If no CareFlow matches and no catch-all is configured, admin is notified with a proposed action.
+
+---
+
+## Data Model Changes
+
+Two new columns on the \`workflow\` table:
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| \`priority_rank\` | INTEGER | NULL | Unique per account. Cannot be NULL when \`workflow_active = true\`. |
+| \`always_fire\` | BOOLEAN | FALSE | When true, fires alongside the priority winner on multi-selection cards. |
+
+### API changes
+
+- \`POST /workflow\` and \`PUT /workflow\`: if \`workflow_active = true\` and \`priority_rank\` is null, return 400: "A priority rank is required before activating a CareFlow."
+- \`PUT /workflow\` (rank change): if the new rank is already in use by another active CareFlow in the same account, return 409: "Rank [N] is already assigned to [CareFlow Name]. Please choose a different rank."
+- \`GET /workflow/list\` response must include \`priority_rank\` and \`always_fire\` fields on each record.
+
+---
+
+## Edge Cases
+
+**EC-1: Guest checks a selection that matches no CareFlow alongside selections that do match.**
+The system uses the matching selections for routing. The unmatched selection appears in Message 1 context but does not affect which CareFlow fires.
+
+**EC-2: Only always-fire CareFlows match, with no non-always-fire CareFlow matching.**
+The always-fire CareFlow with the lowest rank number among the matches is treated as the priority winner. All other matching always-fire CareFlows also fire.
+
+**EC-3: Admin reorders ranks after guest cards have already been processed.**
+Rank changes apply to future routing decisions only. Guests already in-flight are not re-routed.
+
+**EC-4: A CareFlow is deactivated between card confirmation and routing execution.**
+That CareFlow is skipped. If it was the only match, fall back to catch-all or admin notification.
+
+**EC-5: All matching CareFlows are assigned to the same leader.**
+Interaction records are created for all matched CareFlows. The leader receives one Message 1 and one Message 2 covering the full combined context.
+
+**EC-6: Guest submits a card with only open-field content and no checkbox selections.**
+No selections to route on. Treated as no-match: catch-all if configured, admin notification if not.
+
+**EC-7: A rank collision bypasses the database constraint (defensive handling).**
+The database-level unique constraint on \`priority_rank\` per account prevents this. If a collision somehow occurs, the system fires the CareFlow with the alphabetically earlier name, logs an error, and alerts the admin: "Routing conflict detected — two CareFlows share rank [N]. Please resolve this in Settings."
+
+---
+
+## What Does Not Change
+
+- Two-message sequence format (Message 1 = context only, Message 2 = AI-generated reply + SEND / NO / @).
+- CareFlow configuration (6-step editor).
+- CareFlow timing, reminders, fallback escalation, and handoffs.
+- The \`interaction\` table schema — only new columns added to \`workflow\`.
+- Single-selection routing — does not use priority ranking.
+- Catch-all and no-match admin notification behavior.
+- CareFlow changes do not affect guests already in-flight.
+`;
+
+// Render markdown
+const renderer = new marked.Renderer();
+
+// Add IDs to headings for nav anchors
+function slugify(text) {
+  return text.toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+}
+
+renderer.heading = function(text, level) {
+  const id = slugify(text);
+  return `<h${level} id="${id}">${text}</h${level}>`;
+};
+
+// Render task list checkboxes as visual-only (no inputs)
+renderer.listitem = function(text, task, checked) {
+  if (task) {
+    return `<li class="task-list-item">${text.replace(/^<input[^>]+>\s*/, '')}</li>`;
+  }
+  return `<li>${text}</li>`;
+};
+
+marked.setOptions({ renderer, gfm: true, breaks: false });
+document.getElementById('content').innerHTML = marked.parse(SPEC_MD);
+
+// Build sidebar nav from H2s and H3s
+function buildNav() {
+  const nav = document.getElementById('nav');
+  const headings = document.querySelectorAll('#content h2, #content h3');
+  let currentSection = null;
+  let currentSubList = null;
+
+  headings.forEach((h) => {
+    if (h.tagName === 'H2') {
+      const section = document.createElement('div');
+      section.className = 'nav-section';
+
+      const header = document.createElement('a');
+      header.className = 'nav-section-header';
+      header.href = '#' + h.id;
+      header.innerHTML = `<span>${h.textContent}</span>`;
+      section.appendChild(header);
+
+      const subList = document.createElement('div');
+      subList.className = 'nav-subitems open';
+      section.appendChild(subList);
+
+      nav.appendChild(section);
+      currentSection = header;
+      currentSubList = subList;
+    } else if (h.tagName === 'H3' && currentSubList) {
+      const subItem = document.createElement('a');
+      subItem.className = 'nav-subitem';
+      subItem.href = '#' + h.id;
+      subItem.textContent = h.textContent;
+      currentSubList.appendChild(subItem);
+    }
+  });
+}
+
+buildNav();
+
+// Update current section in topbar on scroll
+const currentSectionEl = document.getElementById('current-section');
+const contentWrap = document.getElementById('content-wrap');
+
+function updateCurrentSection() {
+  const h2s = document.querySelectorAll('#content h2');
+  const scrollTop = contentWrap.scrollTop + 80;
+  let active = null;
+  for (const h of h2s) {
+    if (h.offsetTop <= scrollTop) {
+      active = h;
+    } else {
+      break;
+    }
+  }
+  if (active) {
+    currentSectionEl.textContent = active.textContent;
+    document.querySelectorAll('.nav-section-header').forEach(a => a.classList.remove('active'));
+    const navLink = document.querySelector(`.nav-section-header[href="#${active.id}"]`);
+    if (navLink) navLink.classList.add('active');
+  }
+}
+
+contentWrap.addEventListener('scroll', updateCurrentSection);
+updateCurrentSection();
+</script>
+
+</body>
+</html>

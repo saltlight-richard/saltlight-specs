@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rock RMS Spec — SaltLight</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 240px;
+  --topbar-h: 52px;
+  --sidebar-bg: #1e2a38;
+  --sidebar-text: #c8d3df;
+  --sidebar-hover: #2c3e52;
+  --sidebar-active-border: #4d9ef8;
+  --sidebar-active-bg: #243447;
+  --sidebar-active-text: #ffffff;
+  --sidebar-h2-text: #94a9be;
+  --sidebar-h2-hover: #b8c9d8;
+  --topbar-bg: #ffffff;
+  --topbar-border: #e2e8f0;
+  --content-bg: #ffffff;
+  --text-main: #1a202c;
+  --text-muted: #4a5568;
+  --accent: #2c4f7a;
+  --accent-light: #4d9ef8;
+  --code-bg: #f5f7fa;
+  --code-border: #dde3eb;
+  --code-text: #2d3748;
+  --inline-code-bg: #f0f2f5;
+  --inline-code-text: #9b2335;
+  --table-header-bg: #2c4f7a;
+  --table-row-alt: #f7f9fc;
+  --blockquote-border: #4d9ef8;
+  --blockquote-bg: #f0f6ff;
+  --hr-color: #e2e8f0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-main);
+  background: var(--content-bg);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* TOP BAR */
+#topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--topbar-h);
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px 0 calc(var(--sidebar-w) + 20px);
+  z-index: 100;
+  gap: 12px;
+}
+
+#topbar a.back-link {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+#topbar a.back-link:hover { background: #f0f2f5; color: var(--accent); }
+
+#topbar .brand {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+#topbar .sep {
+  color: #cbd5e0;
+  font-size: 16px;
+}
+
+#topbar .current-section {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* SIDEBAR */
+#sidebar {
+  position: fixed;
+  top: var(--topbar-h);
+  left: 0;
+  width: var(--sidebar-w);
+  height: calc(100vh - var(--topbar-h));
+  background: var(--sidebar-bg);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #2c3e52 transparent;
+  z-index: 90;
+  padding: 12px 0 24px 0;
+}
+
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: #2c3e52; border-radius: 2px; }
+
+.nav-section {
+  margin-bottom: 2px;
+}
+
+.nav-section-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px 8px 16px;
+  cursor: pointer;
+  color: var(--sidebar-text);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s, color 0.12s;
+  border-left: 3px solid transparent;
+  user-select: none;
+  line-height: 1.3;
+}
+
+.nav-section-header:hover {
+  background: var(--sidebar-hover);
+  color: #e8edf2;
+}
+
+.nav-section-header.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text);
+  border-left-color: var(--sidebar-active-border);
+}
+
+.nav-section-index {
+  font-size: 11px;
+  color: #4d6a85;
+  margin-right: 8px;
+  font-weight: 600;
+  min-width: 16px;
+  flex-shrink: 0;
+}
+
+.nav-section-header.active .nav-section-index {
+  color: #7ab8f5;
+}
+
+.nav-subitems {
+  display: none;
+  flex-direction: column;
+  padding: 0 0 4px 0;
+}
+
+.nav-subitems.open {
+  display: flex;
+}
+
+.nav-subitem {
+  display: block;
+  padding: 5px 16px 5px 35px;
+  font-size: 12px;
+  color: var(--sidebar-h2-text);
+  cursor: pointer;
+  line-height: 1.35;
+  transition: color 0.1s, background 0.1s;
+  border-left: 3px solid transparent;
+  text-decoration: none;
+}
+
+.nav-subitem:hover {
+  color: var(--sidebar-h2-hover);
+  background: rgba(255,255,255,0.04);
+}
+
+/* CONTENT */
+#content-wrap {
+  margin-left: var(--sidebar-w);
+  margin-top: var(--topbar-h);
+  height: calc(100vh - var(--topbar-h));
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--content-bg);
+  scroll-behavior: smooth;
+}
+
+#content {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 48px 80px 48px;
+}
+
+/* TYPOGRAPHY */
+#content h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 0;
+  margin-bottom: 20px;
+  line-height: 1.25;
+  border-bottom: 2px solid var(--hr-color);
+  padding-bottom: 12px;
+}
+
+#content h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 36px;
+  margin-bottom: 12px;
+  line-height: 1.3;
+  scroll-margin-top: calc(var(--topbar-h) + 20px);
+}
+
+#content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-top: 28px;
+  margin-bottom: 8px;
+  line-height: 1.35;
+  scroll-margin-top: calc(var(--topbar-h) + 20px);
+}
+
+#content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-top: 20px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  scroll-margin-top: calc(var(--topbar-h) + 20px);
+}
+
+#content p {
+  margin-bottom: 14px;
+  color: var(--text-main);
+}
+
+#content ul, #content ol {
+  margin: 0 0 14px 0;
+  padding-left: 24px;
+}
+
+#content li {
+  margin-bottom: 5px;
+  line-height: 1.6;
+}
+
+#content li > ul, #content li > ol {
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+/* INLINE CODE */
+#content code {
+  font-family: "Courier New", "Consolas", "Monaco", monospace;
+  font-size: 13px;
+  background: var(--inline-code-bg);
+  color: var(--inline-code-text);
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* CODE BLOCKS */
+#content pre {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  margin: 14px 0 18px 0;
+  position: relative;
+}
+
+#content pre code {
+  font-family: "Courier New", "Consolas", "Monaco", monospace;
+  font-size: 13px;
+  background: none;
+  color: var(--code-text);
+  padding: 0;
+  border-radius: 0;
+  white-space: pre;
+  line-height: 1.55;
+}
+
+.code-lang-label {
+  display: inline-block;
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #718096;
+  background: var(--code-border);
+  padding: 2px 10px;
+  border-radius: 0 6px 0 6px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: system-ui, sans-serif;
+}
+
+/* TABLES */
+#content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 20px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#content thead tr {
+  background: var(--table-header-bg);
+  color: #ffffff;
+}
+
+#content thead th {
+  padding: 9px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+#content tbody tr:nth-child(even) {
+  background: var(--table-row-alt);
+}
+
+#content tbody td {
+  padding: 8px 14px;
+  border-bottom: 1px solid #e8edf2;
+  vertical-align: top;
+}
+
+/* BLOCKQUOTES */
+#content blockquote {
+  border-left: 4px solid var(--blockquote-border);
+  background: var(--blockquote-bg);
+  padding: 10px 16px;
+  margin: 14px 0;
+  border-radius: 0 6px 6px 0;
+  color: #2d4a6b;
+  font-size: 14px;
+}
+
+#content blockquote p {
+  margin-bottom: 6px;
+  color: inherit;
+}
+
+#content blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* HR */
+#content hr {
+  border: none;
+  border-top: 2px solid var(--hr-color);
+  margin: 32px 0;
+}
+
+/* STRONG / EM */
+#content strong { font-weight: 600; }
+#content em { font-style: italic; }
+
+/* SCROLLBAR in content */
+#content-wrap::-webkit-scrollbar { width: 6px; }
+#content-wrap::-webkit-scrollbar-track { background: transparent; }
+#content-wrap::-webkit-scrollbar-thumb { background: #d0d7e2; border-radius: 3px; }
+#content-wrap::-webkit-scrollbar-thumb:hover { background: #b0bac8; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <a href="../index.html" class="back-link">← All specs</a>
+  <span class="brand">Rock RMS Spec</span>
+  <span class="sep">/</span>
+  <span class="current-section" id="topbar-section">Overview</span>
+</div>
+
+<nav id="sidebar"></nav>
+
+<div id="content-wrap">
+  <div id="content"></div>
+</div>
+
+<script>
+// ─── SECTIONS DATA ────────────────────────────────────────────────────────────
+const SECTIONS = [{"label": "Overview", "content": "# Rock RMS Integration — Kenneth Implementation Spec\n\nThis spec covers everything you need to build the SaltLight ↔ Rock RMS integration. It's written for you specifically — a strong Python/Lambda engineer who's getting up to speed on Rock. Each feature has two parts: a plain-English section (what it does and why) and a technical API contract (what to call and what to expect back).\n\nThe integration has five features:\n\n1. **Feature 1 — Rock Account Connection** — admin pastes in their Rock domain and API key; SaltLight verifies the connection, resolves install-specific IDs, and caches campuses\n2. **Feature 1b — Rock Form Setup** — one-time account-level setup: admin selects which Rock forms SaltLight should watch and maps which field on each form holds name, email, phone, and campus. This mapping is stored once and reused by every CareFlow\n3. **Feature 2 — CareFlow Rock Configuration (Step 6)** — admin connects a mapped form to a CareFlow, sets an optional submission filter, and configures optional write-back (tags + workflows)\n4. **Feature 3 — Guest Intake: Rock → SaltLight** — scheduled Lambda polls Rock and creates SaltLight Connect Cards\n5. **Feature 4 — Card Capture Push: SaltLight → Rock** — when a card is scanned in SaltLight, it's pushed back to Rock automatically\n\nFeatures 3 and 4 read their configuration from Features 1b and 2. All five features depend on Feature 1 being connected first.\n\n**Feature 3 is ingestion only** — it creates Connect Cards and manages poll cursors. It does not write back to Rock. All Rock write-back (tags, workflows, AttributeValues) is owned by Feature 4.\n\n---\n\n## Build and Test Order\n\nBuild and test in this order — each feature depends on the previous:\n\n1. **Feature 1 — Rock Account Connection** → required before anything else. Establishes the Rock domain, API key, cached campuses, and both poll cursors.\n2. **Feature 1b — Rock Form Setup** → required before Feature 3 Track 2 works. Without `mapped_forms` in `account_metadata`, the Workflow poller has no AttributeId mapping and skips every submission.\n3. **Feature 2 — CareFlow Step 6** → required before Feature 3 filtering and Feature 4 write-back work. Without `workflow_data['rockrms']`, CareFlows have no Rock config and neither poller nor push knows what to do.\n4. **Feature 3 — Guest Intake** → can now be tested end-to-end. Track 1 (People) works after Feature 1. Track 2 (Workflows) requires Feature 1b and Feature 2.\n5. **Feature 4 — Card Capture Push** → requires Feature 1 (Rock connection) and Feature 2 (write-back config). Test after Feature 3 is working.\n\n**Important:** If you test Feature 3 Track 2 and see no cards being created, check that at least one form is mapped in `account_metadata['rockrms']['mapped_forms']` (Feature 1b) and at least one CareFlow has Step 6 configured (Feature 2). A missing mapping is a skip-and-warn, not a crash.\n\n---\n\n# Rock RMS — What you need to know\n\n**WorkflowType** is Rock's name for a form template. Your church might have one called \"First Time Guest\" or \"Connection Card\" or \"New Here\" — they named it themselves. When someone submits that form, Rock creates a new Workflow instance. The WorkflowType is the mold; the Workflow is the cast.\n\n**Workflow** is one completed form submission. If 50 people filled out the connect card on Sunday, there are 50 Workflow records. Each one holds the field answers (name, email, phone, etc.) as AttributeValues.\n\n**AttributeValue** is a single field answer inside a Workflow. Rock stores these as key-value pairs where the key is an AttributeId (an integer specific to that Rock install). So \"first name = Sarah\" is one AttributeValue record. Fetching a Workflow's data means fetching its AttributeValues and mapping them back to human-readable fields using the AttributeIds the admin configured in Step 6.\n\n**Person** is a contact record in Rock — their name, email, phone, connection status, etc. Every Person has three IDs you'll encounter: `Id` (an integer, install-specific), `Guid` (a UUID, portable across installs), and `PrimaryAliasId` (the integer used to link Workflows to a specific Person). When SaltLight writes a guest back to Rock, it creates a Person record.\n\n**DefinedValue** is Rock's version of a lookup table row. \"Visitor,\" \"Member,\" and \"Mobile\" are all DefinedValues. The human-readable label lives in Rock's UI. The integer `Id` is install-specific and can differ between churches. The `Guid` is portable — SaltLight uses the Guid to look up the correct integer Id during connection setup, then caches it.\n\n**Tag** is a label you can attach to a Person record — think of it like a flag. SaltLight uses Tags to mark guests it has processed, so a church admin can see at a glance which guests SaltLight has touched.\n\n**CampusPicker** is a Rock field type used when a form asks \"which campus?\" It stores the answer as a Campus.Id integer cast to a string — so you'll see `\"1\"` or `\"2\"`, not `\"North Campus\"`. SaltLight caches campus records on connect so it can resolve that string to a real campus name without a Rock round-trip on every record.\n\n---\n\nHow these relate:\n\n```\nWorkflowType  ──creates──►  Workflow  ──contains──►  AttributeValues\n(form template)             (one submission)          (field answers)\n                                │\n                                └──linked to──►  Person\n                                                  ├── DefinedValues (Visitor, Mobile, Active)\n                                                  ├── Tags (processed flag)\n                                                  └── Campus (via CampusPicker Id)\n```\n\nEverything below describes how SaltLight talks to Rock using these concepts. You don't need to be a Rock expert — that's what this spec is for.\n"}, {"label": "Feature 1 — Account Connection", "content": "# Feature 1 — Rock Account Connection\n\n## What it does\n\nA church admin connects their Rock instance to SaltLight by pasting in their Rock domain and a REST API key. SaltLight verifies the connection works, resolves the install-specific IDs it needs (for Visitor status, Mobile phone type, Active record status, and each campus), and starts watching Rock for new data. From that point on, new guests in Rock flow into SaltLight automatically — no manual import.\n\n## User story\n\nAs a church admin, I want to connect my Rock instance to SaltLight by entering my Rock domain and a REST API key, so that new visitors created in Rock automatically receive SMS follow-up and guests added via SMS are written back into Rock as Person records — without any manual work.\n\n## User journey\n\n**Kenneth — the admin does steps 1–5 in Rock before they ever touch SaltLight. Your job is steps 6–13 (what SaltLight does after they hit Connect).**\n\n**In Rock (admin does this first):**\n\n1. Admin logs into their Rock instance as an administrator.\n2. Goes to Admin Tools → Security → REST Keys.\n3. Creates a new REST key. They can name it whatever they want — \"SaltLight Integration\" is a reasonable suggestion, but it's their call.\n4. Assigns the key to a Rock user account that has View permission on the Person entity. (The spec's permissions section covers the exact minimum required.)\n5. Copies the API key value. That's all they do in Rock.\n\n**In SaltLight portal:**\n\n6. Admin navigates to Integrations → Rock RMS.\n7. Pastes their Rock domain (e.g. `gracechurch.rockrms.com`) and the API key into the form, then clicks Connect.\n\n**What SaltLight does behind the scenes:**\n\n8. Issues an HTTPS request against `https://{domain}/api/People/GetCurrentPerson` with the key in the `Authorization-Token` header. A connection-level failure surfaces as \"Rock unreachable\"; HTTP 401 surfaces as \"under-permissioned\"; HTTP 200 returns the Rock Person record backing the REST key.\n9. Resolves the install-local integer IDs for `Visitor` ConnectionStatus, `Active` RecordStatus, `Mobile` PhoneType, and Person RecordType — each via its portable GUID — and caches them.\n10. Calls `GET /api/Campuses?$filter=IsActive eq true&$select=Id,Guid,Name,ShortCode` and caches each active Campus.\n11. Initializes `poll_cursor_track1` (People high-water mark) and `poll_cursor_track2` (Workflow high-water mark) to `connected_at = utcnow()` — so the first poll run does not pull every historical Rock Person or Workflow.\n12. Stores `org_id = domain` so inbound Rock webhooks can be routed back to this account.\n13. Returns success. The admin sees a connected Rock card in Settings → Integrations showing the church domain and cached campus names. The next scheduled Rock poll will execute on the next 5-minute boundary.\n\n## Examples\n\n**Happy path — Grace Church, two campuses.**\n\nGrace Church runs Rock at `gracechurch.rockrms.com`. Their admin creates a REST key in Rock and pastes the domain and key into SaltLight. SaltLight reaches the domain, validates the key, resolves all four GUID-based IDs (Visitor, Mobile, Active RecordStatus, and Person RecordType), and caches two campuses (Main Campus, North Campus). Both poll cursors are set to now. Within 5 minutes, new guests start appearing in SaltLight.\n\n**Domain unreachable — typo in the domain.**\n\nAdmin mistypes `gracchurch.rockrms.com`. DNS lookup fails. SaltLight surfaces: \"Rock is not reachable at that URL. Verify the domain and that Rock is publicly accessible.\" No SaltLight account state is mutated. To fix, the admin corrects the domain and retries.\n\n**Key valid but under-permissioned — REST user missing Person View.**\n\nThe REST key authenticates (Rock recognizes it), but the backing REST user isn't in any security role with View on the `Rock.Model.Person` entity. Rock returns HTTP 401 from `GET /api/People/GetCurrentPerson`. SaltLight surfaces: \"API key is valid but the user account lacks permissions. In Rock, add the user to a security group with People read access.\"\n\n**Missing DefinedValue — non-standard Rock install.**\n\nA church's Rock install has had the standard `Visitor` ConnectionStatus DefinedValue deleted. The GUID lookup returns an empty array. SaltLight fails the connection: \"Rock instance is missing required system records. Contact SaltLight support.\" No partial state is written.\n\n## Acceptance criteria\n\n- **Reachability gate.** A connect attempt against a non-resolvable or unreachable domain results in HTTP 503 with the unreachable message, and `account_metadata.rockrms` is not written or modified.\n- **Permissions gate.** A connect attempt where `GET /api/People/GetCurrentPerson` returns HTTP 401 results in HTTP 401 to the admin with the under-permissioned message, and `account_metadata.rockrms` is not written or modified.\n- **Successful Person probe.** On HTTP 200 from `GetCurrentPerson`, the response body contains a Person object with an `Id` field — verifiable by logging into Rock at `https://{domain}/Person/{Id}` and confirming the Person record exists.\n- **Campuses cache matches Rock.** After connect, `account_metadata.rockrms.campuses` contains an array of `{id, name}` objects whose Ids and Names exactly match `GET /api/Campuses?$filter=IsActive eq true` in Rock. Length matches, order is Rock's order.\n- **GUID-resolved IDs match the install.** After connect, `account_metadata.rockrms.visitor_id`, `mobile_id`, `active_status_id`, and `person_record_type_id` are positive integers. Verify each via its GUID lookup using `_resolve_guid()` — all four call `GET /api/DefinedValues?$filter=Guid eq guid'{guid}'&$select=Id` and expect a non-empty array. If any GUID does not resolve, the connection fails with HTTP 500.\n- **`org_id` enables webhook routing.** After connect, `account_metadata.rockrms.org_id` equals `account_metadata.rockrms.domain`.\n- **No backfill on connect.** After connect, `poll_cursor_track1` and `poll_cursor_track2` both equal `connected_at` (within 1 second). The first poll run logs zero People processed and zero Workflows processed.\n- **Poller is armed.** After a successful connect, the next Rock poll executes on the next 5-minute boundary. Verifiable by confirming `account_metadata['rockrms']['last_polled']` is updated within 5 minutes of connect (it will differ from `connected_at` once the first poll runs).\n- **Idempotent reconnect.** If the admin reconnects with the same domain and a new key, the existing `rockrms` block is overwritten in full (campuses re-fetched, IDs re-resolved, cursors reset to the new `connected_at`).\n\n---\n\n## Technical API contract\n\n### Rock API calls (in order)\n\nAll calls go to `https://{domain}/api/...` with the admin's API key passed in the `Authorization-Token` header. Rock 18.1.0.0 was used for live testing against `saltlight.rockcloud.com`.\n\n**1. `GET /api/People/GetCurrentPerson` — permissions probe**\n\nPurpose: confirm the API key authenticates AND the user has People read access. This is the only call that distinguishes \"key is bad\" from \"key is fine but user has no permissions.\"\n\nResponse: a single Person object on success.\n\nBehavior:\n- HTTP 200 — key valid and user has People access. Proceed.\n- HTTP 401 — key valid but the user account lacks the security role. Surface the under-permissioned error.\n- Connection error — domain unreachable. Surface the unreachable error.\n\n**2. `GET /api/DefinedValues?$filter=Guid eq guid'{guid}'&$select=Id` — resolve portable GUIDs**\n\nPurpose: Rock's integer IDs for ConnectionStatus, PhoneType, RecordStatus, and Person RecordType are install-specific. The portable identifier is the GUID, which is the same on every Rock install. Each lookup needs to be resolved to its local integer at connect time.\n\nResponse shape: a bare JSON array of `DefinedValue` objects. With `$select=Id`, each element is `{\"Id\": <int>}`.\n\nGUIDs to resolve (all confirmed against `saltlight.rockcloud.com`):\n\n| Concept | GUID | Test env value |\n|---|---|---|\n| Visitor ConnectionStatus | `B91BA046-BC1E-400C-B85D-638C1F4E0CE2` | `66` |\n| Mobile PhoneType | `F1A30C23-EC3B-4BCD-8CBC-6928F15E7223` | `12` |\n| Active RecordStatus | `618F906C-C33D-4FA3-8AEF-E58CB7B63F1E` | `3` |\n| Person RecordType | `36CF452D-9E4A-4CB3-ADD6-52D5BE61C5CB` | (verify) |\n\n> **Verify Mobile PhoneType GUID:** The GUID above is the standard Rock install value. Confirm it resolves correctly on `saltlight.rockcloud.com` with `GET /api/DefinedValues?$filter=Guid eq guid'F1A30C23-EC3B-4BCD-8CBC-6928F15E7223'&$select=Id` before treating it as ground truth. If it returns empty, check the existing `create_connection()` implementation for the GUID currently in use.\n\nGotcha: if a GUID does not resolve (empty array), fail the connection rather than store `None` — downstream code will assume these IDs are present.\n\n**3. `GET /api/Campuses?$filter=IsActive eq true&$select=Id,Guid,Name,ShortCode` — cache campuses**\n\nPurpose: cache the church's active campuses so per-record campus matching does not have to hit Rock every poll.\n\nResponse shape: **a bare JSON array** — not the OData `{\"value\":[...]}` envelope. Pass the result through the codebase's `_to_list` helper to handle both shapes safely.\n\nEach campus object contains: `Id`, `Guid`, `Name`, `ShortCode`. Extract and store `{id, name}` per campus.\n\nConfirmed in test env: two campuses returned — `{Id:1, Name:\"Main Campus\"}` and `{Id:2, Name:\"North Campus\"}`.\n\n### What gets stored in SaltLight\n\nAll connection state lives in `public.account.account_metadata['rockrms']`. No new tables. The full shape after a successful connect:\n\n```json\n{\n  \"connected\": true,\n  \"church_name\": \"gracechurch.rockrms.com\",\n  \"connected_at\": \"2026-05-26T22:00:00Z\",\n  \"settings\": {\"create_enabled\": false},\n\n  \"domain\": \"gracechurch.rockrms.com\",\n  \"org_id\": \"gracechurch.rockrms.com\",\n\n  \"visitor_id\": 66,\n  \"mobile_id\": 12,\n  \"active_status_id\": 3,\n  \"person_record_type_id\": 1,\n\n  \"campuses\": [\n    {\"id\": 1, \"name\": \"Main Campus\"},\n    {\"id\": 2, \"name\": \"North Campus\"}\n  ],\n\n  \"poll_cursor_track1\": \"2026-05-26T22:00:00Z\",\n  \"poll_cursor_track2\": \"2026-05-26T22:00:00Z\",\n  \"last_polled\": \"2026-05-26T22:00:00Z\",\n\n  \"poll_schedule\": {\n    \"high_frequency_days\": [5, 6],\n    \"high_frequency_start\": \"15:00\",\n    \"high_frequency_end\": \"21:00\",\n    \"low_frequency_interval_hours\": 12,\n    \"timezone\": \"America/Chicago\"\n  }\n}\n```\n\nField-by-field purpose:\n\n| Field | Used for |\n|---|---|\n| `connected`, `connected_at`, `church_name`, `settings` | Existing connection record (already written by `set_connection`). |\n| `domain` | Base URL for every Rock API call. |\n| `org_id` | Inbound webhook routing — must equal `domain`. |\n| `visitor_id` | `ConnectionStatusValueId` when creating People in Rock (write-back). |\n| `mobile_id` | `NumberTypeValueId` for identifying and writing the mobile entry in `PhoneNumbers`. |\n| `active_status_id` | `RecordStatusValueId` when creating People in Rock (write-back). |\n| `person_record_type_id` | `RecordTypeValueId` when creating People in Rock (write-back). Needed by Feature 4's `POST /api/People`. Value requires verification against `saltlight.rockcloud.com`. |\n| `campuses` | In-memory campus list for per-record matching during poll and write-back. |\n| `poll_cursor_track1` | High-water mark for the People poll (Track 1). Initialized to `connected_at` so no backfill. |\n| `poll_cursor_track2` | High-water mark for the Workflow poll (Track 2). Initialized to `connected_at` so no backfill. |\n| `last_polled` | Last successful poll run timestamp. |\n| `poll_schedule` | Per-church poll cadence. |\n\n### Rock API gotchas specific to this feature\n\n- **`/api/Campuses` returns a bare array, not `{\"value\":[...]}`.** Always run it through `_to_list` rather than indexing `result['value']`.\n- **Two different 401 meanings.** HTTP 401 from `/api/People/GetCurrentPerson` does NOT mean the key is invalid — it usually means the key authenticated but the user has no security role. The error message shown to the admin must reflect this distinction.\n- **GUIDs are the only portable identifiers.** `visitor_id=66`, `mobile_id=12`, `active_status_id=3`, and `person_record_type_id=1` are accurate for the test env only. Never hard-code these — always resolve via GUID at connect time and cache the resulting integer.\n- **`$filter` GUID syntax.** Rock's OData filter requires the literal prefix `guid'...'` — e.g. `$filter=Guid eq guid'618F906C-C33D-4FA3-8AEF-E58CB7B63F1E'`. The prefix is not optional.\n- **No backfill on first connect.** Both poll cursors must be initialized to `connected_at` (or `utcnow()`). If they default to epoch or `None`, the first poll will try to pull every Person and every Workflow in the church's Rock history.\n\n---\n\n## Reference implementation (optional)\n\n> Kenneth — this is one way to implement the above. If you prefer to write your own code, skip this section entirely.\n\n**Where it goes.** Extend the existing `create_connection()` method in `tf/lambda_functions/shared/integrations/rockrms.py`, called from `handle_rockrms_connect()` in `tf/lambda_functions/orchestrator/src/rockrms.py`. The existing connectivity probe and `visitor_id`/`mobile_id` resolution stay; the new work (permissions probe, active status, campuses, cursors, `org_id`) runs before the final `set_connection()` call.\n\n**Reading the existing connection elsewhere.** The base integration class does NOT have a `get_account_metadata()` method. Use `self.get_connection()` — it returns the `rockrms` sub-dict from `account_metadata`, or `None` if no connection exists.\n\n**About `self.api_request(method, path)`:** Takes the HTTP method (`'GET'`, `'POST'`, `'PATCH'`) and a Rock API path (e.g. `/api/DefinedValues?$filter=...`). The domain and `Authorization-Token` header are injected automatically from the stored connection. Returns the parsed JSON body. Raises `AuthenticationHttpError` on HTTP 401 and `RequestConnectionError` on network failure. Other HTTP errors raise their own exception types — wrap calls that can fail for non-401 reasons with a broad `except Exception`.\n\n**About `set_connection()`:** Call as `set_connection(connected=True, church_name=domain, other={...})`. The `other` dict is merged into the stored `rockrms` block alongside `connected`, `connected_at`, `church_name`, and `settings`. Every key in `other` is written; missing keys are not cleared. Pass all new fields (domain, org_id, visitor_id, mobile_id, active_status_id, person_record_type_id, campuses, cursors, last_polled, poll_schedule) in a single `other={}` call. Verify the exact signature in `tf/lambda_functions/shared/integrations/base.py` before use.\n\n```python\nset_connection(\n    connected=True,\n    church_name=domain,  # or church name if available\n    other={\n        'domain':                domain,\n        'org_id':                domain,\n        'visitor_id':            visitor_id,\n        'mobile_id':             mobile_id,\n        'active_status_id':      active_status_id,\n        'person_record_type_id': person_record_type_id,\n        'campuses':              campuses,\n        'poll_cursor_track1':    now,\n        'poll_cursor_track2':    now,\n        'last_polled':           now,\n        'poll_schedule': {\n            'high_frequency_days':        [5, 6],\n            'high_frequency_start':       '15:00',\n            'high_frequency_end':         '21:00',\n            'low_frequency_interval_hours': 12,\n            'timezone':                   'America/Chicago',\n        },\n    }\n)\n# Note: set_connection() signature uses connected=True and church_name= as top-level kwargs.\n# Verify the exact signature in tf/lambda_functions/shared/integrations/base.py before use.\n# 'now' is computed once above as datetime.utcnow().isoformat() + 'Z'\n# All poll_schedule times are stored as UTC strings in v1 (timezone field is stored but unused).\n```\n\n**Helper to add to the `RockRMS` class:**\n\n```python\ndef _resolve_guid(self, guid: str) -> int:\n    \"\"\"Resolve a portable Rock DefinedValue GUID to this install's integer ID.\n    Raises ValueError if the GUID is not present — connect should fail fast.\"\"\"\n    url = f\"/api/DefinedValues?$filter=Guid eq guid'{guid}'&$select=Id\"\n    values = self._to_list(self.api_request('GET', url))\n    if not values:\n        raise ValueError(f\"Rock DefinedValue GUID not found: {guid}\")\n    return values[0]['Id']\n```\n\n**Endpoints to register on `self.endpoint_info`:**\n\n```python\n'current_person': {'url': '/api/People/GetCurrentPerson'},\n'campuses':       {'url': '/api/Campuses?$filter=IsActive eq true&$select=Id,Guid,Name,ShortCode'},\n```\n\n**Logical flow inside `create_connection()` (after existing probes):**\n\n1. Call the permissions probe — `GET /api/People/GetCurrentPerson`. On `AuthenticationHttpError`, re-raise so the handler can map it to the under-permissioned 401 message.\n2. Resolve `mobile_id` via `self._resolve_guid('F1A30C23-EC3B-4BCD-8CBC-6928F15E7223')` — only if the existing `create_connection()` code does not already resolve it. Check before adding.\n3. Resolve `active_status_id` via `self._resolve_guid('618F906C-C33D-4FA3-8AEF-E58CB7B63F1E')`.\n4. Resolve `person_record_type_id` via `self._resolve_guid('36CF452D-9E4A-4CB3-ADD6-52D5BE61C5CB')`. This is the \"Person\" RecordType used by `POST /api/People` in Feature 4. Verify the GUID resolves on `saltlight.rockcloud.com` before treating it as final.\n5. Fetch campuses via `self.api_request('GET', self.endpoint_info['campuses']['url'])`, pass through `self._to_list(...)`, and project to `[{'id': c['Id'], 'name': c['Name']} for c in campuses_raw]`.\n6. Compute `now = datetime.utcnow().isoformat() + 'Z'`.\n7. Call `set_connection()` with the full `other={}` payload (domain, `org_id`, visitor/mobile/active/person-record-type IDs, campuses, both cursors, `last_polled`, default `poll_schedule`).\n\n**Error mapping in `handle_rockrms_connect()`:**\n\n| Exception | HTTP | Body |\n|---|---|---|\n| `AuthenticationHttpError` (from permissions probe) | 401 | `{\"error\": \"API key is valid but the user account lacks permissions. In Rock, add the user to a security group with People read access.\"}` |\n| `RequestConnectionError` (domain unreachable) | 503 | `{\"error\": \"Rock is not reachable at that URL. Verify the domain and that Rock is publicly accessible.\"}` |\n| `ValueError` (GUID didn't resolve) | 500 | `{\"error\": \"Rock instance is missing required system records. Contact SaltLight support.\"}` |\n\n**Note on POST responses.** Not used in Feature 1, but worth knowing for adjacent work: `POST /api/People` returns a **bare integer** (the new Person Id), same shape as `POST /api/Workflows`. Do NOT call `.get('Id')` on these responses — `int` has no `.get`.\n"}, {"label": "Feature 1b — Form Setup", "content": "# Feature 1b — Rock Form Setup\n\n## What it does\n\nRight after a church connects Rock (Feature 1), SaltLight walks the admin through a one-time form setup: which Rock forms should SaltLight watch, and which field on each form holds the guest's name, email, phone, and campus?\n\nSaltLight loads the church's active Rock forms, the admin picks the ones they want to use, and SaltLight auto-suggests field matches by comparing Rock field names to SaltLight's five core fields. The admin corrects anything wrong, confirms, and saves. That mapping lives at the account level — every CareFlow reuses it. If the church adds a new form later, they come back to Integrations and add it there.\n\n## User story\n\nAs a church admin who has just connected Rock, I want to tell SaltLight which of my existing Rock forms to watch and which fields on each form hold guest information, so that I only have to do this mapping once — not every time I build a new CareFlow.\n\n## User journey\n\n1. Admin completes the Rock connection (Feature 1). The portal transitions directly to the Form Setup step.\n\n2. SaltLight calls `GET /api/WorkflowTypes?$filter=IsActive eq true` and displays the church's active Rock forms as a checklist (name + Id). Admin selects every form they want SaltLight to use. Most churches have one — some have two or three (e.g. \"First Time Guest\" and \"New Members Class\").\n\n3. Admin clicks Next. For each selected form, SaltLight loads the form's Attributes from Rock.\n\n4. SaltLight runs auto-suggest: for each of the five SaltLight fields (First Name, Last Name, Email, Phone, Campus), it scores every Rock attribute name and pre-selects the best match. See auto-suggest logic below.\n\n5. The admin sees a mapping screen per form — five rows, each pre-filled with the best guess. Confident matches show a small \"auto-matched\" indicator. Blank rows (no confident match) are highlighted so the admin knows to fill them in.\n\n6. Admin corrects any wrong matches, fills in any blanks, and clicks Save.\n\n7. The mapping is stored at the account level. The admin sees a summary: \"3 forms configured — First Time Guest, New Members Class, Youth Interest Form.\"\n\n8. Later, if the church adds a new Rock form: admin goes to Settings → Integrations → Rock → Manage Forms → Add Form. Same flow for the new form only.\n\n## Auto-suggest logic\n\nSaltLight normalizes both sides (lowercase, strip punctuation and extra spaces) and looks for keyword matches. No Rock API call needed — this is pure SaltLight string matching on field names returned from `/api/Attributes`.\n\n| SaltLight field | Keywords that trigger a confident match |\n|---|---|\n| First Name | \"first\", \"fname\", \"given\", \"forename\" |\n| Last Name | \"last\", \"lname\", \"surname\", \"family\" |\n| Email | \"email\", \"mail\" |\n| Phone | \"phone\", \"mobile\", \"cell\", \"contact number\" |\n| Campus | \"campus\", \"location\", \"site\", \"congregation\" |\n\n**Confidence tiers:**\n- **High (auto-fill, show \"auto-matched\" badge):** normalized field name contains one of the above keywords AND no other field on the form scored equally for the same SaltLight slot\n- **Ambiguous (auto-fill, show warning):** two Rock fields scored equally for the same SaltLight slot — pre-fill the first alphabetically but flag it for review\n- **No match (leave blank, highlight):** no Rock field name contains any keyword for that SaltLight slot — admin must fill in manually\n\nThe auto-suggest is a convenience, not a guarantee. The admin always has the final word. Saving with any of the five core fields blank is blocked with a validation error naming the missing field.\n\n## Examples\n\n**Grace Church — single form, confident auto-match.**\n\nGrace's \"First Time Guest\" form has attributes: \"First Name\" (Id 8281), \"Last Name\" (Id 8282), \"Email Address\" (Id 8283), \"Cell Phone\" (Id 8284), \"Home Campus\" (Id 8285), \"Interest Area\" (Id 8286).\n\nAuto-suggest results:\n- First Name → \"First Name\" (Id 8281) — high confidence (\"first\")\n- Last Name → \"Last Name\" (Id 8282) — high confidence (\"last\")\n- Email → \"Email Address\" (Id 8283) — high confidence (\"email\")\n- Phone → \"Cell Phone\" (Id 8284) — high confidence (\"cell\")\n- Campus → \"Home Campus\" (Id 8285) — high confidence (\"campus\")\n\nAdmin sees all five pre-filled. No corrections needed. One click to save.\n\n**Calvary Chapel — custom field names, partial auto-match.**\n\nCalvary's form has: \"Guest Given Name\" (Id 1041), \"Guest Surname\" (Id 1042), \"Contact Email\" (Id 1043), \"Best Number\" (Id 1044), \"Which Campus?\" (Id 1045).\n\nAuto-suggest results:\n- First Name → \"Guest Given Name\" (Id 1041) — high confidence (\"given\")\n- Last Name → \"Guest Surname\" (Id 1042) — high confidence (\"surname\")\n- Email → \"Contact Email\" (Id 1043) — high confidence (\"email\")\n- Phone → blank — \"Best Number\" contains no keyword. Admin fills in manually.\n- Campus → \"Which Campus?\" (Id 1045) — high confidence (\"campus\")\n\nAdmin sees four pre-filled, one blank highlighted. They select \"Best Number\" for Phone and save.\n\n## Acceptance criteria\n\n- After Feature 1 completes, the admin is immediately prompted to set up forms. Form setup is required before the admin can access other portal features. (A \"skip for now\" flow is not defined in v1 — if product decides to add it later, it will need an explicit spec.)\n- The form checklist shows all active Rock WorkflowTypes. Inactive types are not shown.\n- Admin can select one or more forms. Selecting zero and clicking Next is blocked: at least one form must be selected before proceeding.\n- For each selected form, auto-suggest pre-fills the mapping using the keyword logic above. High-confidence matches are visually distinguished from ambiguous ones.\n- Saving with any of the five core fields blank is blocked. The validation error names the missing field (e.g. `{\"error\": \"phone mapping is required for 'First Time Guest'\"}`). This validation is server-side, enforced by the `POST /integrations/rockrms/forms/mapping` endpoint.\n- After saving, `account_metadata['rockrms']['mapped_forms']` contains one entry per mapped form with the correct `workflow_type_id`, `workflow_type_name`, and `attribute_ids` object.\n- The mapping can be verified end-to-end: submit a test form submission in Rock, wait for Feature 3's poller, and confirm the resulting SaltLight Connect Card contains correct first name, last name, email, phone, and campus.\n- \"Manage Forms\" in Integrations → Rock allows adding a new form (same flow), removing a form (with warning if any CareFlows reference it), or re-mapping fields on an existing form.\n- Removing a mapped form that is referenced by one or more CareFlows is enforced server-side: the `DELETE /integrations/rockrms/forms/{workflowTypeId}` endpoint returns HTTP 409 with a list of CareFlow names if any active CareFlows reference it. A `?force=true` query param bypasses the check. The portal shows the 409 response as a confirmation dialog.\n\n---\n\n## Technical API contract\n\n### Rock API calls\n\n**1. List active WorkflowTypes** — same call as Feature 2's form dropdown, already validated.\n\n- `GET /api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Name&$orderby=Name asc`\n- Returns bare array. Run through `_to_list()`.\n- Key fields: `Id`, `Name`. Display both to admin.\n\n**2. Load attributes for each selected form** — same call as current Feature 2 field-mapping, already validated.\n\n- `GET /api/Attributes?$filter=EntityTypeId eq 113 and EntityTypeQualifierColumn eq 'WorkflowTypeId' and EntityTypeQualifierValue eq '{workflowTypeId}'&$select=Id,Key,Name,FieldTypeId`\n- Returns bare array.\n- Run auto-suggest against the `Name` field of each returned attribute.\n\n### What gets stored in SaltLight\n\nStored in `account_metadata['rockrms']['mapped_forms']` — a JSON array, one entry per mapped form:\n\n```json\n{\n  \"mapped_forms\": [\n    {\n      \"workflow_type_id\": 24,\n      \"workflow_type_name\": \"First Time Guest\",\n      \"attribute_ids\": {\n        \"first_name\": 8281,\n        \"last_name\": 8282,\n        \"email\": 8283,\n        \"phone\": 8284,\n        \"campus\": 8285\n      }\n    }\n  ]\n}\n```\n\nFeatures 3 and 4 look up the `attribute_ids` for a given `workflow_type_id` from this array. They no longer read `attribute_ids` from the CareFlow's `workflow_data['rockrms']`.\n\n### SaltLight backend endpoints for Feature 1b\n\nKenneth — these are the SaltLight-side endpoints you need to build. Follow the existing handler pattern in `tf/lambda_functions/orchestrator/src/rockrms.py`.\n\n**1. `GET /integrations/rockrms/forms` — load available Rock forms**\n\nCalled by the portal to populate the form-selection checklist. Proxies `GET /api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Name&$orderby=Name asc` from Rock and returns the bare array to the portal. Requires an active Rock connection (`self.get_connection()` must return non-None).\n\n**2. `GET /integrations/rockrms/forms/{workflowTypeId}/attributes` — load attributes for a form**\n\nCalled by the portal when the admin selects forms and clicks Next. Proxies `GET /api/Attributes?$filter=EntityTypeId eq 113 and EntityTypeQualifierColumn eq 'WorkflowTypeId' and EntityTypeQualifierValue eq '{workflowTypeId}'&$select=Id,Key,Name,FieldTypeId` and runs auto-suggest server-side. Returns:\n\n```json\n{\n  \"attributes\": [{\"Id\": 8281, \"Name\": \"First Name\", \"Key\": \"FirstName\", \"FieldTypeId\": 1}, ...],\n  \"suggestions\": {\n    \"first_name\": {\"attribute_id\": 8281, \"confidence\": \"high\"},\n    \"last_name\":  {\"attribute_id\": 8282, \"confidence\": \"high\"},\n    \"email\":      {\"attribute_id\": 8283, \"confidence\": \"high\"},\n    \"phone\":      {\"attribute_id\": 8284, \"confidence\": \"high\"},\n    \"campus\":     {\"attribute_id\": 8285, \"confidence\": \"high\"}\n  }\n}\n```\n\nThe `suggestions` object is the output of `auto_suggest(attributes)`. `confidence` is one of `\"high\"`, `\"ambiguous\"`, or `\"none\"`. A `\"none\"` suggestion means `attribute_id` is `null` and the portal must leave that slot blank for the admin to fill in.\n\n**3. `POST /integrations/rockrms/forms/mapping` — save the completed mapping**\n\nCalled by the portal when the admin clicks Save. Request body:\n\n```json\n{\n  \"mappings\": [\n    {\n      \"workflow_type_id\": 24,\n      \"workflow_type_name\": \"First Time Guest\",\n      \"attribute_ids\": {\n        \"first_name\": 8281,\n        \"last_name\": 8282,\n        \"email\": 8283,\n        \"phone\": 8284,\n        \"campus\": 8285\n      }\n    }\n  ]\n}\n```\n\nValidates that all 5 `attribute_ids` fields are non-null integers. Rejects with HTTP 400 and a field-level error if any are missing (e.g. `{\"error\": \"phone mapping is required for 'First Time Guest'\"}`). On success, writes `mappings` array to `account_metadata['rockrms']['mapped_forms']` using `jsonb_set`. Returns HTTP 200.\n\n```sql\n-- Full-replace mapped_forms array (replaces any existing mapping for all affected forms):\nUPDATE public.account\nSET account_metadata = jsonb_set(\n    account_metadata,\n    ARRAY['rockrms', 'mapped_forms']::text[],\n    %s::jsonb\n)\nWHERE account_id = %s\n-- Params: (json.dumps(mappings_list), account_id)\n-- mappings_list is the validated 'mappings' array from the request body.\n-- This full-replace strategy is safe because the portal sends the complete\n-- configured set. Individual form merges are not needed in v1.\n```\n\n**4. `DELETE /integrations/rockrms/forms/{workflowTypeId}` — remove a mapped form**\n\nChecks whether any active CareFlow references this `workflow_type_id` in `workflow_data['rockrms']`. Query:\n\n```sql\nSELECT w.workflow_id, w.workflow_name\nFROM public.workflow w\nWHERE w.account_id = %s\n  AND w.workflow_active = true  -- verify: confirm this column is named workflow_active (not workflow_present)\n  AND w.workflow_data->'rockrms' @> %s::jsonb\n-- Params: (account_id, json.dumps([{\"workflow_type_id\": workflow_type_id}]))\n-- The second param is a JSON string built in Python, e.g.:\n--   import json\n--   json_filter = json.dumps([{\"workflow_type_id\": workflow_type_id}])\n-- This checks that workflow_data['rockrms'] contains an element with the given workflow_type_id.\n```\n\nIf any CareFlows reference it: return HTTP 409 with `{\"error\": \"...\", \"careflows\": [{\"id\": ..., \"name\": ...}]}` listing the CareFlows by name. The portal shows this list as the warning. Admin must explicitly confirm removal — the portal calls DELETE again with `?force=true` to bypass the check and proceed. On success, removes the entry from `mapped_forms` and returns HTTP 200.\n\n```sql\n-- Remove a single form entry from mapped_forms by workflow_type_id:\nUPDATE public.account\nSET account_metadata = jsonb_set(\n    account_metadata,\n    ARRAY['rockrms', 'mapped_forms']::text[],\n    (\n        SELECT COALESCE(jsonb_agg(el), '[]'::jsonb)\n        FROM jsonb_array_elements(\n            account_metadata->'rockrms'->'mapped_forms'\n        ) el\n        WHERE (el->>'workflow_type_id')::int != %s\n    )\n)\nWHERE account_id = %s\n-- Params: (workflow_type_id, account_id)\n```\n\n### Auto-suggest implementation note\n\n```python\nFIELD_KEYWORDS = {\n    'first_name': ['first', 'fname', 'given', 'forename'],\n    'last_name':  ['last', 'lname', 'surname', 'family'],\n    'email':      ['email', 'mail'],\n    'phone':      ['phone', 'mobile', 'cell', 'contact number'],\n    'campus':     ['campus', 'location', 'site', 'congregation'],\n}\n\ndef auto_suggest(attributes: list) -> dict:\n    \"\"\"Returns {saltlight_field: {attribute_id, confidence}} for each of the 5 fields.\n    confidence: 'high' | 'ambiguous' | 'none'\"\"\"\n    ...\n```\n\nRun server-side when the admin finishes selecting forms. Return suggestions alongside the attribute list so the portal can pre-populate the dropdowns.\n"}, {"label": "Feature 2 — CareFlow Step 6", "content": "# Feature 2 — CareFlow Rock Configuration (Step 6)\n\n## What it does\n\nStep 6 is where a church admin connects a SaltLight CareFlow to a Rock form.\n\nThe hard part — which Rock fields hold the guest's name, email, phone, and campus — was already done in Feature 1b when the admin mapped their forms. Step 6 is just three questions:\n\n1. **Which mapped form triggers this CareFlow?** (dropdown of already-mapped forms)\n2. **Should we filter which submissions come in?** (optional — e.g. only pull in submissions where \"Interest Area\" = \"Sunday Service\")\n3. **When SaltLight captures a guest in this CareFlow, what should we write back to Rock?** (optional — tags to apply, workflows to launch)\n\nThat's it. No field mapping here.\n\n## User story\n\nAs a church admin, I want to connect my SaltLight CareFlow to a specific Rock form and optionally filter which submissions come in and which Rock tags and workflows fire when a guest is captured — so that Rock and SaltLight stay in sync without me doing anything manually.\n\n## User journey\n\n1. Admin opens an existing CareFlow (or creates one) and navigates to Step 6 — \"Rock Integration.\"\n\n2. The screen has three sections: **Form**, **Filter** (optional), and **Write-back** (optional).\n\n3. **Form — pick which Rock form triggers this CareFlow.** Dropdown shows only the forms the admin already mapped in Feature 1b (e.g. \"First Time Guest,\" \"New Members Class\"). Selecting a form is the only required action in Step 6. Leaving it blank means no Rock integration for this CareFlow.\n\n4. **Filter — narrow which submissions come in (optional).** Admin picks one attribute from the selected form as a filter field (e.g. \"Interest Area\"), then selects which values should trigger this CareFlow (e.g. \"Sunday Service,\" \"Youth Ministry\"). SaltLight loads the allowed values from Rock — handling both DefinedValue picker fields and Value List fields. If no filter is set, every completed submission of this form flows into the CareFlow.\n\n5. **Write-back — what to do when SaltLight captures a guest (optional).** Two independent multi-selects:\n   - **Tags:** select one or more Rock person Tags (queried live from Rock — `GET /api/Tags?$filter=EntityTypeId eq 15&$select=Id,Name&$orderby=Name asc`). All selected tags are applied to the matched Rock Person when a card is captured in this CareFlow.\n   - **Workflows:** select one or more Rock WorkflowTypes to launch (queried live from Rock). A new workflow instance is created for each selected type when a card is captured.\n\n6. Admin clicks Save.\n\n## Examples\n\n**Example 1 — Grace Church, filtered inbound + write-back.**\n\nAdmin opens \"Sunday Morning First-Timers\" CareFlow and goes to Step 6. They pick \"First Time Guest\" from the form dropdown. They set the filter to \"Interest Area\" = \"Sunday Service\" or \"Youth Ministry.\" For write-back, they select Tags: \"New Visitor\" + \"Sunday Attendee\" (two tags), and Workflows: \"First Time Guest Follow-up\" (one workflow). Save.\n\nResult: only \"First Time Guest\" submissions where Interest Area is Sunday Service or Youth Ministry land in this CareFlow. Every card captured in this CareFlow tags the Rock person with two tags and launches one follow-up workflow.\n\n**Example 2 — Calvary Chapel, no filter, single write-back.**\n\nAdmin picks \"First Time Guest,\" no filter (every submission comes in), one tag (\"New Visitor\"), no workflow. Save.\n\n**Example 3 — New Life Church, no Rock integration.**\n\nAdmin leaves Step 6 blank. No Rock data flows in or out for this CareFlow.\n\n**Example 4 — Youth Ministry CareFlow, different write-back than Sunday Morning.**\n\nSame church, same \"First Time Guest\" form as Example 1 — but this CareFlow filters for \"Youth Ministry\" only and has different write-back: Tags: \"Youth Interest,\" Workflows: \"Youth Follow-up Workflow.\" Different tags and workflows per CareFlow, same underlying form mapping.\n\n## Acceptance criteria\n\n- The form dropdown shows only forms the admin has already mapped in Feature 1b — not all Rock WorkflowTypes.\n- Selecting a form is the only required field. Leaving Step 6 entirely blank is valid — no Rock integration for this CareFlow.\n- The filter attribute dropdown shows the attributes defined on the selected form. Selecting a filter attribute loads its allowed values from Rock (DefinedValue picker and Value List both handled).\n- The Tags multi-select is populated by `GET /api/Tags?$filter=EntityTypeId eq 15&$select=Id,Name&$orderby=Name asc`. Admin can select one or more tags, or none.\n- The Workflows multi-select is populated via `GET /integrations/rockrms/workflow-types` (which proxies `GET /api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Name&$orderby=Name asc` to Rock). Admin can select one or more, or none.\n- Tags and Workflows are independent — admin can configure tags without workflows, or workflows without tags, or both, or neither.\n- After Save, `workflow_data['rockrms']` reflects exactly what was configured (see data shape below).\n- A CareFlow with no Rock config (`workflow_data['rockrms']` absent or `[]`) works normally — the poller skips it, Feature 4 makes no Rock calls.\n- No write calls are made to Rock during Step 6. All Rock calls are read-only (loading dropdowns). Write-back (tag application, workflow creation, AttributeValue writes) fires in Feature 4 at card capture time — not here.\n\n---\n\n## Technical API contract\n\n### Rock API calls used to populate the UI\n\n**1. Form dropdown** — pre-populated from `account_metadata['rockrms']['mapped_forms']` (no Rock API call needed at this point).\n\n**2. Filter attribute dropdown** — re-fetch attributes for the selected form when admin picks one.\n\n- `GET /api/Attributes?$filter=EntityTypeId eq 113 and EntityTypeQualifierColumn eq 'WorkflowTypeId' and EntityTypeQualifierValue eq '{workflowTypeId}'&$select=Id,Key,Name,FieldTypeId`\n- Returns bare array. Run through `_to_list()`. This is the same Rock endpoint used in Feature 1b's attribute loading step.\n\n**3. Filter allowed values** — only needed when admin picks a filter attribute.\n\n- DefinedValue picker (FieldTypeIds 5 and 16 only): read `definedtypeguid` qualifier → resolve to DefinedTypeId → list `/api/DefinedValues?$filter=DefinedTypeId eq {id}&$select=Id,Value&$orderby=Order asc`. Returns `[{Id, Value}, ...]` — use `Id` as the stored `id` and `Value` as the displayed `label`.\n- Value List (FieldTypeId 6): parse pipe-delimited `values` qualifier string.\n- Campus picker (FieldTypeId 53): NOT a DefinedValue type — it does not use a `definedtypeguid` qualifier. Return the list from `rock_meta['campuses']` (cached at connect time) as `[{id: campus['id'], label: campus['name']}]`. Do not hit the Rock API for this — the campuses are already cached.\n- Returns `[{id, label}, ...]`.\n\n**4. Tags multi-select**\n\n- `GET /api/Tags?$filter=EntityTypeId eq 15&$select=Id,Name&$orderby=Name asc`\n- Returns bare array.\n\n**5. Workflows multi-select**\n\n- SaltLight endpoint: `GET /integrations/rockrms/workflow-types` (or verify the existing route name in `tf/lambda_functions/orchestrator/src/rockrms.py`)\n- Rock API proxied: `GET /api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Name&$orderby=Name asc`\n- Returns bare array of `{Id, Name}` objects. **Do NOT reuse the form dropdown result** — the form dropdown shows only *mapped* forms, but the write-back Workflows dropdown must show ALL active WorkflowTypes (the admin may want to launch a workflow that is not one of the mapped intake forms).\n- If no route exists yet for this endpoint, add one following the `handle_rockrms_forms` pattern.\n\n### What gets stored in SaltLight\n\nOn Save, `public.workflow.workflow_data['rockrms']` holds an array of length 0 or 1:\n\n```json\n[{\n  \"workflow_type_id\": 24,\n  \"trigger_attribute_id\": 8286,\n  \"trigger_values\": [\"Sunday Service\", \"Youth Ministry\"],\n  \"writeback_tag_ids\": [42, 87],\n  \"writeback_workflow_type_ids\": [24, 31]\n}]\n```\n\n**What changed from the previous spec:**\n- `attribute_ids` is gone — field mapping now lives at the account level in `account_metadata['rockrms']['mapped_forms']`.\n- `writeback_tag_ids` replaces `writeback_tag_id` — now an array (multi-select).\n- `writeback_workflow_type_ids` replaces `writeback_workflow_type_id` — now an array (multi-select).\n\n> **⚠️ Migration note for Kenneth:** The field names `writeback_tag_ids` and `writeback_workflow_type_ids` are NEW. Any existing code in Feature 3, Feature 4, or the database schema that reads `writeback_tag_id` (singular) or `writeback_workflow_type_id` (singular) must be updated to read the new plural array fields. These are breaking field name changes — the old singular keys no longer exist in `workflow_data['rockrms']` after Feature 2 ships.\n\nField-by-field:\n\n| Field | Type | Required | Purpose |\n|---|---|---|---|\n| `workflow_type_id` | int | yes (when entry present) | Which Rock form this CareFlow listens to. Key for looking up `attribute_ids` in `mapped_forms`. |\n| `trigger_attribute_id` | int \\| null | optional | The Rock attribute used to filter which submissions come in. |\n| `trigger_values` | string[] | optional | Allowed values for `trigger_attribute_id`. Empty array = no filter (all submissions in). |\n| `writeback_tag_ids` | int[] | optional | Rock Tag Ids to apply on card capture. Empty array = no tags. |\n| `writeback_workflow_type_ids` | int[] | optional | Rock WorkflowType Ids to instantiate on card capture. Empty array = no workflows. |\n\n### How Features 3 and 4 read the new shape\n\n**Feature 3 (inbound poller)** — to get `attribute_ids` for a given `workflow_type_id`:\n\n```python\n# Note: in Feature 3's context, rock_meta IS account_metadata['rockrms'] (the sub-dict\n# returned by the account selection query), so .get('mapped_forms', []) is correct.\nmapped_forms = rock_meta.get('mapped_forms', [])  # same as account_metadata['rockrms']['mapped_forms']\nform_map = {f['workflow_type_id']: f['attribute_ids'] for f in mapped_forms}\nattr_ids = form_map.get(cfg['workflow_type_id'])\n```\n\n**Feature 4 (card capture push)** — write-back now loops:\n\n```python\n# Apply all configured tags\nfor tag_id in cfg.get('writeback_tag_ids', []):\n    post_tagged_item(tag_id, person_guid)\n\n# Launch all configured workflows\nfor wf_type_id in cfg.get('writeback_workflow_type_ids', []):\n    wf_id = post_workflow(wf_type_id, primary_alias_id)\n    set_workflow_attribute_values(wf_id, attr_ids, card_data)\n```\n\nFeatures 3 and 4 must be updated to use this lookup pattern and loop over arrays instead of reading single IDs. All other logic (dedup, cursor management, tag application, AttributeValue writes) is unchanged.\n"}, {"label": "Feature 3 — Guest Intake", "content": "# Feature 3 — Guest Intake: Rock → SaltLight\n\n## What it does\n\nA scheduled Lambda polls Rock and turns new guest data into SaltLight Connect Cards automatically. It watches two data sources:\n\n**Track 1 — Rock Person records.** When a volunteer or staff member adds a new Person directly in Rock (from a check-in kiosk or data entry screen), that person should appear in SaltLight too. The poller fetches recently created or modified Person records from Rock and creates a Connect Card for each new person it hasn't seen before.\n\n**Track 2 — Rock Workflow form submissions.** When a guest fills out a church's existing connect card form in Rock (their WorkflowType — e.g. \"First Time Guest,\" Id=24), that completed submission becomes a SaltLight Connect Card. The poller fetches completed Workflow instances for each WorkflowType configured in Step 6, reads the guest's field values using the AttributeId mapping set up in Feature 1b (stored at the account level — not per-CareFlow), and creates a Connect Card.\n\nBoth tracks run on every poll tick. Each Connect Card gets one `interaction` row per active CareFlow with a matching Rock config. The poll runs at high frequency on service days, low frequency on weekdays — so follow-up starts within minutes of a guest appearing in Rock. The care team never re-keys data that Rock already captured.\n\n## User story\n\nAs a church running Rock RMS, I want every new Rock Person record (especially visitors) and every completed submission of my existing connect card form to appear in SaltLight as a Connect Card automatically, so my care team can start the follow-up SMS conversation without manually transferring the data.\n\n## User journey\n\n**Track 1 — Rock Person record**\n\n1. A volunteer opens Rock's data entry screen (or a check-in kiosk creates the record) and adds a new Person — name, mobile phone, ConnectionStatusValueId=66 (\"Visitor\" in this Rock install), PrimaryCampusId.\n2. Rock writes the Person row and stamps `ModifiedDateTime` to the current UTC time.\n3. On its next tick (within 5 minutes on a service day), the SaltLight poll Lambda calls `GET /api/People` filtered by the stored cursor timestamp.\n4. For each returned Person, SaltLight checks whether a Connect Card already exists for this Rock Person. If yes, skip.\n5. For new Persons: resolve `PrimaryCampusId` to a campus name, pull the mobile phone from the `PhoneNumbers` list, write one `connect_card` row tagged `source: rock_track1`.\n6. Insert one `interaction` row per active CareFlow that has a Rock config.\n7. Advance `poll_cursor_track1` in `account_metadata['rockrms']` to the max `ModifiedDateTime` seen in this batch.\n\n**Track 2 — Rock Workflow form submission**\n\n1. A guest fills out the church's existing connect card form in Rock (e.g. \"First Time Guest,\" WorkflowTypeId=24) at a kiosk or via a web form.\n2. Rock creates a Workflow instance and sets its Status to `Completed`. Each form field is persisted as a Rock Workflow AttributeValue keyed by `(AttributeId, EntityId=Workflow.Id)`.\n3. On its next tick, the poll Lambda queries Workflows filtered by `WorkflowTypeId`, `Status=Completed`, and `CreatedDateTime` after `poll_cursor_track2`.\n4. For each returned Workflow instance, SaltLight dedupes on `rock_workflow_id`. If a Connect Card already exists for this Workflow instance, skip.\n5. SaltLight looks up the `attribute_ids` for this `workflow_type_id` from `account_metadata['rockrms']['mapped_forms']` (set in Feature 1b — the account-level form mapping). It then batch-fetches all AttributeValues for those AttributeIds. Note: `trigger_attribute_id` (the CareFlow's optional filter field) is also included in the AttributeValues batch fetch — it comes from the CareFlow's `workflow_data['rockrms']` config (Feature 2 Step 6), not from `mapped_forms`. Only the five core field mappings (first_name, last_name, email, phone, campus) live in `mapped_forms`.\n6. Read first name, last name, email, phone, and the CampusPicker value (stored as a string integer — e.g. `\"1\"`, not `\"Main Campus\"`), resolve the campus name from the cached campus list, and write one `connect_card` row tagged `source: rock_track2`.\n7. If `InitiatorPersonAliasId` is non-null, call `GET /api/PersonAlias/{aliasId}` to link to an existing Rock Person. If null (common in anonymous kiosk submissions), process the Workflow from AttributeValues alone — no Person link required.\n8. Insert one `interaction` row per matching CareFlow.\n9. Advance `poll_cursor_track2` to the global max `CreatedDateTime` seen across all configured WorkflowTypeIds.\n\n## Examples\n\n**Track 1 — Staff-added Rock Person.** A volunteer creates James Wilson in Rock at 10:05am Sunday — name, mobile, Visitor status, campus set to Main Campus (Id=1). Rock stamps `ModifiedDateTime=2026-05-24T15:05:00Z`. At 10:10am the SaltLight poll runs, finds James in the response, dedupes (no existing card for `rock_person_id=9`), resolves `PrimaryCampusId=1` → \"Main Campus,\" picks the mobile phone number, and writes a Connect Card with `source='rock_track1'`. Cursor advances to `2026-05-24T15:05:00Z`.\n\n**Track 2 — James fills out a form.** James walks to the welcome kiosk and submits the church's \"First Time Guest\" form (WorkflowTypeId=24). Rock creates Workflow.Id=1, Status=Completed. The next poll fetches Workflow 1, reads AttributeValues 8281–8285 (the five core fields from `account_metadata['rockrms']['mapped_forms']`, set once in Feature 1b) plus AttributeId 8286 (the trigger attribute from the CareFlow's Step 6 `trigger_attribute_id`), resolves the CampusPicker value `\"1\"` → \"Main Campus,\" and creates a second Connect Card tagged `source='rock_track2'`.\n\n**Dedup — same form submitted twice.** James hits submit twice at the kiosk. Rock creates Workflow.Id=1 and Workflow.Id=2. The poller creates a Connect Card for each (they're distinct Workflow instances). Dedup only prevents the same Workflow.Id from creating two cards — two distinct submissions are two distinct cards. This is intentional.\n\n**Dedup — same Person re-touched.** A volunteer edits James's email in Rock the next day. His `ModifiedDateTime` bumps and the poll returns Person.Id=9 again. Dedup query against `rock_person_id='9'` finds the existing Connect Card — skip. No duplicate created.\n\n## Acceptance criteria\n\n**Track 1**\n\n- The poller fetches Rock Person records modified after `poll_cursor_track1`.\n- A Connect Card is created for each Person not already in SaltLight (dedup by Rock Person Id).\n- `PrimaryCampusId` is resolved to a campus name before writing the card. If resolution fails, the card is still created with campus left blank.\n- Mobile phone is pulled from the `PhoneNumbers` list using `NumberTypeValueId == rock_meta['mobile_id']`. If no mobile phone exists, the card is created with phone blank — not a crash.\n- `poll_cursor_track1` is advanced to the max `ModifiedDateTime` in the batch after each successful poll. Cursors are NOT advanced when the batch is empty.\n- Already-seen Person records are not re-processed.\n\n**Track 2**\n\n- The poller fetches Workflow instances where `WorkflowTypeId` matches a configured CareFlow, `Status=Completed`, and `CreatedDateTime` is after `poll_cursor_track2`.\n- A Connect Card is created for each Workflow instance not already in SaltLight (dedup by `rock_workflow_id`).\n- Guest fields are read from AttributeValues using the AttributeId mapping stored in `account_metadata['rockrms']['mapped_forms']` (set once per form in Feature 1b) — not from the CareFlow config, and not guessed or hardcoded. Lookup pattern: `form_map = {f['workflow_type_id']: f['attribute_ids'] for f in mapped_forms}; attr_ids = form_map.get(cfg['workflow_type_id'])`.\n- CampusPicker values (string integers like `\"1\"`) are resolved to campus names before writing the card.\n- Workflows with a null `InitiatorPersonAliasId` are processed from AttributeValues alone — no Person link required, no crash.\n- If a trigger field is configured (Step 6), only Workflow instances where that AttributeValue matches one of the allowed values create a Connect Card. Non-matching instances are skipped.\n- `poll_cursor_track2` is advanced to the global max `CreatedDateTime` across all configured WorkflowTypeIds after each successful poll tick (all types succeeded).\n- **If any configured WorkflowType's poll raises an exception during a tick, `poll_cursor_track2` is NOT advanced** — `latest_cursor_2` is discarded entirely and the cursor stays at its pre-poll value. Partial success (advancing for succeeded types only) is NOT allowed.\n- One `interaction` row is inserted per matching CareFlow per new Connect Card.\n\n**Both tracks**\n\n- Poll frequency is higher on configured service days and lower on weekdays. The schedule is stored per-account in `account_metadata['rockrms']['poll_schedule']`.\n- A Rock API failure on one tick does not advance the cursor — the next tick retries from the same position.\n- One account's Rock API failure does not abort processing for other accounts.\n- Every Connect Card created by this Lambda carries either `source='rock_track1'` or `source='rock_track2'` — so Feature 4 can recognize and skip them, preventing echo loops.\n- Feature 3 does NOT apply Rock Tags or create Rock Workflows. All write-back to Rock (tags, workflows, AttributeValues) is Feature 4's responsibility. Rock-originated cards (`rock_track1`, `rock_track2`) are excluded from Feature 4 write-back by the source guard — this means Rock-originated guests do not receive Rock tag/workflow write-back in v1. This is a known v1 limitation.\n\n---\n\n## Technical API contract\n\n### Poll trigger\n\n- **Schedule.** EventBridge rule `rock-poll-{env}` fires the orchestrator Lambda every 5 minutes with `{\"scheduled_event\": true, \"function\": \"rock_poll\"}`. Per-account schedule shaping (service-day vs. weekday) is handled inside the handler — the EventBridge cadence is always 5 minutes.\n- **Entry point.** `rock_poll_handler(event)` in `tf/lambda_functions/orchestrator/src/rockrms.py`, registered in the `SCHEDULED_EVENT_FUNCTIONS` dict in `main.py` as `\"rock_poll\": rock_poll_handler`.\n- **Account selection.** `SELECT account_id, account_metadata->'rockrms' AS rock_meta FROM public.account WHERE (account_metadata->'rockrms'->>'connected')::boolean = true AND account_active = true`. Each account is processed inside its own try/except.\n\n> **Kenneth — verify column name:** The CareFlow query in `_poll_rock_account` must filter by the active-flag column on the `workflow` table. Confirm whether the column is `workflow_active` or `workflow_present` in the actual schema before implementation. The query pattern should be: `SELECT ... FROM public.workflow WHERE workflow_data ? 'rockrms' AND [active_column] = true AND account_id = %s`.\n\n### Track 1 — People poll\n\n- **Endpoint.** `GET /api/People?$filter=ModifiedDateTime gt datetime'{cursor}'&$expand=PhoneNumbers&$orderby=ModifiedDateTime asc&$top=100`\n- **Response shape — CONFIRMED.** Bare JSON array `[...]`. Run it through `_to_list()`.\n- **Datetime literal.** Cursor must be wrapped in `datetime'...'`. Bare ISO strings return HTTP 400.\n- **Fields available inline (no expand needed).** `Id`, `FirstName`, `LastName`, `Email`, `PrimaryFamilyId`, `ConnectionStatusValueId`, `PrimaryAliasId`, `PrimaryCampusId` (scalar int or null), `ModifiedDateTime`, `CreatedDateTime`.\n- **Fields requiring `$expand=PhoneNumbers`.** Without the expand, `PhoneNumbers` is an empty array. With it, each phone has `Number` (digits only, e.g. `\"5552011001\"`), `NumberFormatted` (`\"(555) 201-1001\"`), `NumberTypeValueId` (mobile is `12` on saltlight.rockcloud.com — read from `rock_meta['mobile_id']`), and `IsMessagingEnabled`.\n- **Do NOT add `$select`.** When combined with `$expand=PhoneNumbers`, Rock silently strips the PhoneNumbers collection from the response.\n- **Campus resolution.** Only `PrimaryCampusId` (a scalar int) is available inline. `$expand=Campus` is silently ignored — no nested Campus object is ever returned. Resolve the name from `rock_meta['campuses']` (cached at connect time). If `PrimaryCampusId` is null or unknown to the cache, `campus_name` is null. Test data note: all 10 test people (Ids 9–18) have `PrimaryCampusId: null`, so the first end-to-end test run will show null campus everywhere — that is test-data emptiness, not a bug.\n- **Cursor.** `ModifiedDateTime` ascending, stored in `account_metadata['rockrms']['poll_cursor_track1']`. Advanced to `max(p['ModifiedDateTime'] for p in new_people)` only when `new_people` is non-empty.\n\n### Track 2 — Workflow poll\n\n- **Endpoint.** `GET /api/Workflows?$filter=WorkflowTypeId eq {id} and Status eq 'Completed' and CreatedDateTime gt datetime'{cursor}'&$orderby=CreatedDateTime asc&$top=100`\n- **Response shape — CONFIRMED.** Bare JSON array `[...]`. Run through `_to_list()`.\n- **Status filter.** `Status eq 'Completed'` is the correct literal. Confirmed status values on saltlight.rockcloud.com are `\"Completed\"` and `\"Active\"`.\n- **Fields available inline.** `Id`, `WorkflowTypeId`, `WorkflowIdNumber`, `Status`, `InitiatorPersonAliasId` (nullable), `CreatedDateTime`, `ModifiedDateTime`, `CompletedDateTime`, `CampusId` (nullable scalar int).\n- **`InitiatorPersonAliasId` null handling.** All 5 pre-populated test workflow fixtures have `InitiatorPersonAliasId: null`. Production workflows submitted by signed-in users should have it set, but code MUST treat null as expected — log a debug line, skip the person resolution, and continue processing the workflow from AttributeValues only.\n- **PersonAlias resolution (when not null).** `GET /api/PersonAlias/{aliasId}?$select=Id,PersonId` returns the full PersonAlias object (Rock ignores `$select` on single-record GETs — that's fine, just `.get('PersonId')`). Use `.get('PersonId')` defensively.\n- **Do NOT use `$expand=AttributeValues` on `/api/Workflows`.** Returns HTTP 400 — AttributeValues are not OData nav properties. Fetch them separately (see next section).\n- **Cursor.** `CreatedDateTime` ascending, stored in `account_metadata['rockrms']['poll_cursor_track2']`. Iterate every configured `workflow_type_id` (deduped via a `type_ids_seen` set), accumulate the per-type max, and write the global max once after all types finish.\n\n### Track 2 — AttributeValues batch fetch\n\n- **Endpoint.** `GET /api/AttributeValues?$filter=AttributeId eq {id1} or AttributeId eq {id2}...&$select=AttributeId,EntityId,Value&$top=5000`\n- **Response shape — CONFIRMED.** Bare JSON array `[...]`. Run through `_to_list()`.\n- **Fields returned.** `AttributeId`, `EntityId`, `Value` — all present even with `$select`.\n- **Batching.** Build a single OR-of-AttributeIds filter per workflow type per poll run. Then group locally by `EntityId == wf['Id']` to assemble the `wf_attrs: {AttributeId → Value}` dict for each workflow instance.\n- **Field-type value formats — CONFIRMED on saltlight.rockcloud.com:**\n  - Text (FieldTypeId 1): raw string, e.g. `\"James\"`.\n  - Email (FieldTypeId 71): raw string, e.g. `\"james.wilson@example.com\"`.\n  - Phone (stored as Text FieldTypeId 1 in this form): raw string with formatting, e.g. `\"(555) 201-1001\"`. Do not strip — store as-is in `rock_data.phone`.\n  - Value List (FieldTypeId 6): raw label string, e.g. `\"Sunday Service\"` — already the human label, no lookup needed.\n  - CampusPicker (FieldTypeId 30): string integer e.g. `\"1\"` or `\"2\"` — this is `Campus.Id` as a string, NOT the campus name. `_create_connect_card_from_workflow` must resolve it via `rock_meta['campuses']` before writing the card.\n\n### Deduplication\n\n- **Track 1.** Before insert: `SELECT connect_card_id FROM public.connect_card WHERE account_id = %s AND connect_card_data->>'rock_person_id' = %s`. If a row exists, skip. (The cast `->>'` returns text, so pass `str(person['Id'])`.)\n- **Track 2.** Same shape with `connect_card_data->>'rock_workflow_id'` and `str(wf['Id'])`.\n- **Why pre-check, not unique constraint.** Rock person/workflow Ids are not globally unique across SaltLight accounts — they're only unique within one Rock install. Scoping the lookup with `account_id = %s` makes a single pre-check sufficient.\n\n**Performance note:** Both dedup queries scan a JSONB field on a potentially large table. Add these indexes to the migration:\n\n```sql\nCREATE INDEX CONCURRENTLY idx_connect_card_rock_person_id\n    ON public.connect_card ((connect_card_data->>'rock_person_id'))\n    WHERE connect_card_data->>'rock_person_id' IS NOT NULL;\n\nCREATE INDEX CONCURRENTLY idx_connect_card_rock_workflow_id\n    ON public.connect_card ((connect_card_data->>'rock_workflow_id'))\n    WHERE connect_card_data->>'rock_workflow_id' IS NOT NULL;\n```\n\n**Concurrency note:** Two simultaneous Lambda invocations (possible if EventBridge fires while a prior invocation is still running) can both pass the dedup SELECT before either inserts, creating duplicate cards. The safest mitigation is to set the poll Lambda's reserved concurrency to 1 in the Lambda configuration — this prevents overlapping executions at zero cost. Document this in your deployment notes.\n\n### `connect_card_data` shape written to DB\n\nTrack 1:\n\n```json\n{\n  \"source\": \"rock_track1\",\n  \"rock_person_id\": 9,\n  \"rock_data\": {\n    \"first_name\": \"James\",\n    \"last_name\": \"Wilson\",\n    \"email\": \"james.wilson@example.com\",\n    \"phone\": \"5552011001\",\n    \"campus_id\": 1,\n    \"campus_name\": \"Main Campus\"\n  }\n}\n```\n\nTrack 2:\n\n```json\n{\n  \"source\": \"rock_track2\",\n  \"rock_workflow_id\": 1,\n  \"rock_workflow_type_id\": 24,\n  \"rock_data\": {\n    \"first_name\": \"James\",\n    \"last_name\": \"Wilson\",\n    \"email\": \"james.wilson@example.com\",\n    \"phone\": \"(555) 201-1001\",\n    \"campus_name\": \"Main Campus\"\n  }\n}\n```\n\nNote: Track 1 phone is digits-only (`PhoneNumbers[].Number`); Track 2 phone is whatever string the Rock form stored, typically formatted. Downstream consumers normalize both via the existing `format_phone()` helper.\n\n### OData response shape — CORRECTED rule\n\n> Earlier drafts of this spec said `/api/People` and `/api/Workflows` return `{\"value\":[...]}` while only the other endpoints return bare arrays. **That was wrong.** Live testing on saltlight.rockcloud.com (Rock 18.1.0.0) confirms that ALL list endpoints on this install return bare JSON arrays `[...]`. The `_to_list()` helper must be applied uniformly to every list response — `/api/People`, `/api/Workflows`, `/api/AttributeValues`, `/api/WorkflowTypes`, `/api/Tags`, `/api/Attributes`, `/api/AttributeQualifiers`, `/api/Campuses`, `/api/DefinedValues`. Do NOT call `.get('value', [])` on any of them. The earlier wording in the API gotchas table is superseded by this section.\n\n### Known gotchas (live-confirmed)\n\n- **`$expand=Campus` is silently ignored.** No nested Campus object is ever returned on `/api/People`. Use the cached campus list.\n- **`$select` strips `$expand=PhoneNumbers`.** Use `$expand=PhoneNumbers` alone; do not combine with `$select`.\n- **`$expand=AttributeValues` on `/api/Workflows` → HTTP 400.** Always batch-fetch AttributeValues separately.\n- **Bare ISO datetime in `$filter` → HTTP 400.** Always wrap with `datetime'...'`.\n- **`$select` on single-record GETs is ignored.** `GET /api/PersonAlias/{id}?$select=Id,PersonId` returns the whole object. Use `.get('PersonId')` defensively.\n- **All test people have null campus.** Expected during initial test runs; not a bug.\n- **All test workflows have null `InitiatorPersonAliasId`.** Code must skip person resolution gracefully when null.\n- **Cursors are strings, not datetimes.** They round-trip through JSONB. Compare/`max()` lexically — ISO-8601 sorts correctly as string.\n- **Cursors stored without timezone suffix.** All cursor and timestamp strings in `account_metadata` must include a UTC marker (e.g. `\"2026-05-24T15:05:00Z\"`). Use `datetime.utcnow().isoformat() + 'Z'` or `datetime.now(timezone.utc).isoformat()` when writing. Without `Z`, comparisons against timezone-aware Python datetimes raise `TypeError`.\n- **Track 2 cursor and partial type failures.** If one WorkflowType's poll raises an exception mid-batch, do NOT advance `poll_cursor_track2` at all that tick — discard `latest_cursor_2` and leave the cursor at its pre-poll value. A succeeded type's timestamps must not advance the cursor past a failed type's unprocessed window. Treat any per-type failure as a full Track 2 failure for that account on that tick.\n\n---\n\n## Reference implementation (optional)\n\n> Kenneth — this is one way to wire the above together. Skip if you prefer your own structure; only the API contract and acceptance criteria above are binding.\n\n**Handler entry — `rock_poll_handler(event)`**\n\nFetches every connected, active Rock account; calls `_poll_rock_account(account_id, rock_meta, db)` inside a try/except per account. One account's failure logs and continues.\n\n**Per-account driver — `_poll_rock_account(account_id, rock_meta, db)`**\n\n1. Instantiate `RockRMS(account_id=account_id)`.\n2. Load active CareFlows with Rock config (`workflow_data ? 'rockrms'`). Return early if none.\n3. Track 1: read `poll_cursor_track1` (fallback `connected_at`), call `poll_new_people(since=cursor)`, iterate. For each person: dedup on `rock_person_id` → if new, call `_create_connect_card_from_person(...)`. (No Rock write-back here — tag and workflow write-back is Feature 4's responsibility. Feature 3 creates the Connect Card and inserts the interaction row only.) After the loop, advance the cursor to `max(p['ModifiedDateTime'] for p in new_people)`.\n4. Track 2: read `poll_cursor_track2` (fallback `connected_at`). Walk CareFlows, dedupe `workflow_type_id`s via a `seen` set. Look up the `attribute_ids` for each `workflow_type_id` from `account_metadata['rockrms']['mapped_forms']` (Feature 1b data). For each type, **wrap the per-type poll in a try/except**: call `poll_new_workflow_completions(workflow_type_id, since=cursor)`. If a per-type call raises, set a `track2_failed = True` flag, log the error, and continue to the next type. Collect every `attribute_id` (form fields + trigger) into one OR-of-Ids filter, call `batch_fetch_attribute_values(ids)` once. For each workflow: dedup on `rock_workflow_id`; build `wf_attrs = {av['AttributeId']: av['Value'] for av in attr_values if av['EntityId'] == wf['Id']}`; for each matching CareFlow config, check `trigger_value in cfg['trigger_values']` and call `_create_connect_card_from_workflow(...)` if it matches. Accumulate `latest_cursor_2` as the max `CreatedDateTime` seen across all types. After the loop: **if `track2_failed` is True, do NOT write `latest_cursor_2`** — leave `poll_cursor_track2` at its pre-poll value. Otherwise write once at the end.\n\n**Card writer — `_create_connect_card_from_person(account_id, person, rock_meta, active_careflows, db) -> int`**\n\n- Resolve `campus_id = person.get('PrimaryCampusId')` and look up `campus_name` from `rock_meta['campuses']` (None if not found).\n- Resolve `phone` as the first `PhoneNumbers[].Number` whose `NumberTypeValueId == rock_meta['mobile_id']`.\n- Assemble the Track 1 `card_data` JSON (shape above).\n- `INSERT INTO public.connect_card (account_id, connect_card_data, connect_card_processed) VALUES (%s, %s, false) RETURNING connect_card_id`.\n- For each CareFlow in `active_careflows`, insert one `public.interaction` row with `interaction_status = 'pending'`.\n- Return the new `connect_card_id`.\n\n**Card writer — `_create_connect_card_from_workflow(account_id, wf, wf_attrs, cfg, workflow_id, rock_meta, db) -> int`**\n\n- Look up `attr_ids` from `account_metadata['rockrms']['mapped_forms']`: `form_map = {f['workflow_type_id']: f['attribute_ids'] for f in rock_meta.get('mapped_forms', [])}; attr_ids = form_map.get(cfg['workflow_type_id'])`. If `attr_ids` is None (form not yet mapped), log a warning and skip.\n- Pull `first_name`, `last_name`, `email`, `phone` directly from `wf_attrs.get(attr_ids[field])` (string values, formatted as Rock stored them).\n- Read the raw campus value `wf_attrs.get(attr_ids.get('campus'))`. It's a string Id (`\"1\"`). Resolve to `campus_name` via `rock_meta['campuses']` (compare `int(value)` to each `campus['id']`).\n- Assemble the Track 2 `card_data` JSON (shape above) including `rock_workflow_id`, `rock_workflow_type_id`.\n- Same `INSERT … RETURNING connect_card_id` and one `interaction` row keyed to the matched `workflow_id` (the SaltLight CareFlow, not the Rock workflow).\n- Return the new `connect_card_id`.\n\n**Cursor writer — `_update_poll_cursor(account_id, cursor_track1, cursor_track2, last_polled, db)`**\n\nSingle UPDATE using nested `jsonb_set` calls to update all three cursors (`poll_cursor_track1`, `poll_cursor_track2`, `last_polled`) atomically in one statement. This avoids a race window that would exist between separate UPDATE calls. If a track had no new records this tick, pass the existing stored cursor value so it does not advance.\n\n```sql\n-- Updates poll_cursor_track1, poll_cursor_track2, AND last_polled in one atomic statement.\n-- Use nested jsonb_set to avoid a race window between separate UPDATE calls.\nUPDATE public.account\nSET account_metadata = jsonb_set(\n    jsonb_set(\n        jsonb_set(\n            account_metadata,\n            ARRAY['rockrms', 'poll_cursor_track1']::text[],\n            to_jsonb(%s::text)\n        ),\n        ARRAY['rockrms', 'poll_cursor_track2']::text[],\n        to_jsonb(%s::text)\n    ),\n    ARRAY['rockrms', 'last_polled']::text[],\n    to_jsonb(%s::text)\n)\nWHERE account_id = %s\n-- Params: (new_cursor_track1, new_cursor_track2, now_utc, account_id)\n-- Pass None/NULL values as the existing stored value if a track had no new records this tick.\n```\n\nParams: `(new_cursor_track1, new_cursor_track2, now_utc, account_id)`. Pass the existing `poll_cursor_track1` value if Track 1 had no new records (so it doesn't advance); pass the existing `poll_cursor_track2` value if Track 2 had no new records (so it doesn't advance). The string-form path `'{rockrms,%s}'` does NOT bind `%s` and writes the literal `\"%s\"` into JSONB — always use the ARRAY form.\n\n**Helper — `_to_list(response)`**\n\nAlready in `shared/integrations/rockrms.py` from prior work. Returns `response` if it's already a list, else `response.get('value', [])` as a safety net. Per the corrected rule above, every list endpoint on this Rock install returns a bare array, so the `.get('value', [])` branch is defensive only — never relied on.\n\n---\n\n## Implementation upgrade notes\n\n> **Kenneth — read this before touching the existing `rockrms.py` implementation.** The current implementation has several bugs that conflict with this spec. Fix these before building:\n\n1. **`poll_new_people()` — use `ModifiedDateTime`, not `CreatedDateTime`.** Track 1 filters and sorts by `ModifiedDateTime`. If the existing method uses `CreatedDateTime` in the `$filter` or `$orderby`, change both to `ModifiedDateTime`. The cursor advance must also use `max(p['ModifiedDateTime'] for p in new_people)`.\n\n2. **`poll_new_people()` and `poll_new_workflow_completions()` — use `_to_list()`, not `.get('value', [])`.** All Rock list endpoints return bare arrays. Calling `.get('value', [])` directly on the response raises `AttributeError: 'list' object has no attribute 'get'`. Use `self._to_list(self.api_request('GET', url))`.\n\n3. **Remove any tag write-back loop from `_poll_rock_account()`.** Feature 3 is ingestion only. If the existing implementation has a loop like `for cfg in careflow['rock_config']: tag_id = cfg.get('writeback_tag_id'); if tag_id: apply_rock_tag(...)` — delete it entirely. Tag and workflow write-back belongs to Feature 4.\n\n4. **`_update_poll_cursor()` — must be the 3-cursor atomic version.** If the existing function takes a single `cursor_key` parameter and makes separate UPDATE calls per cursor, replace it with the nested `jsonb_set` version shown in the \"Cursor writer\" section above. Two separate UPDATE calls create a race window. The `last_polled` key must also be written in the same UPDATE.\n\n5. **`_create_connect_card_from_workflow()` — read `attribute_ids` from `mapped_forms`, not from the CareFlow config.** If the existing code does `attr_ids = cfg.get('attribute_ids', {})`, that is the old per-CareFlow architecture. Replace with the `form_map` lookup pattern shown in the \"Card writer\" section above. The function also needs `rock_meta` passed in as a parameter to perform this lookup.\n\n6. **`_create_connect_card_from_workflow()` — resolve CampusPicker values before storing.** If the existing code stores the raw `\"1\"` string in `campus_name` without resolving via `rock_meta['campuses']`, fix it. The raw CampusPicker value is a string Campus Id, not the campus name.\n\n7. **Any code that writes timestamp strings to `account_metadata` — append `'Z'` to all UTC timestamp strings.** Use `datetime.utcnow().isoformat() + 'Z'`. This applies to `_update_poll_cursor()` and any other code that writes `last_polled`, `poll_cursor_track1`, or `poll_cursor_track2`. Without the `Z` suffix, comparisons against timezone-aware Python datetimes raise `TypeError` and cursor advancement silently breaks.\n"}, {"label": "Feature 4 — Card Capture Push", "content": "# Feature 4 — Card Capture Push: SaltLight → Rock\n\n## What it does\n\nWhen a volunteer scans or enters a connect card in SaltLight, SaltLight pushes that guest into Rock immediately.\n\nHere's what happens in order:\n\n1. SaltLight searches Rock for an existing Person by email, then by phone. If found, it updates the existing record. If not found, it creates a new one marked as Visitor.\n2. SaltLight applies a Tag to that Person — the \"New Visitor\" tag, or whatever the admin configured in Step 6.\n3. SaltLight creates a new instance of the church's existing Workflow type (e.g. \"First Time Guest\" — not a SaltLight-created form, the one the church already has in Rock). The guest's card data goes in as AttributeValues on that Workflow.\n\nIf Rock is unreachable at any point, the card is marked pending and retried on the next poll cycle. The CareFlow in SaltLight runs immediately regardless — Rock sync failure never blocks the guest follow-up.\n\n## User story\n\nAs a church admin using Rock, I want guests captured in SaltLight to appear in Rock automatically — matched against existing Person records, tagged as a new visitor, and added to my existing First Time Guest Workflow with their card data already filled in — so my Rock database stays current without anyone re-typing cards.\n\n## User journey\n\n1. A volunteer scans a physical connect card (or types one in) in SaltLight.\n2. SaltLight writes the card and matches it to a CareFlow that has Rock write-back configured.\n3. SaltLight searches Rock for an existing Person record:\n   - Search 1: by email — `GET /api/People?$filter=Email eq '{card_email}'`\n   - Search 2: by phone (only if email is blank or returns nothing)\n4. Depending on the result:\n   - **Person found:** SaltLight updates the existing Rock record. Only non-blank card fields are written — nothing is blanked out.\n   - **Person not found:** SaltLight creates a new Rock Person. Rock returns a **bare integer** (e.g. `22`) — not a dict. SaltLight reads that integer directly as the new Person Id.\n5. SaltLight fetches the Person's `Guid` and `PrimaryAliasId` (needed for the Tag and Workflow steps).\n6. If the CareFlow has Tags configured, SaltLight applies each one to the Person (loops over `writeback_tag_ids` array — each tag is a separate `POST /api/TaggedItems` call).\n7. If the CareFlow has WorkflowTypes configured, SaltLight creates a new Workflow instance for each one (loops over `writeback_workflow_type_ids` array). Card fields are written into each Workflow as AttributeValues.\n8. The card's sync status flips to `synced`. The CareFlow runs in SaltLight as normal.\n\nIf Rock is unreachable at steps 3–7, the card is marked `pending`. The retry sweep in the Rock poll Lambda picks it up on the next poll cycle. The CareFlow is not affected either way.\n\n## Examples\n\n**Maria — existing Person, full sync.**\n\nVolunteer scans Maria's card. Rock already has a Person record for her (matched by email, Id=9). SaltLight issues `PATCH /api/People/9` with her non-blank card fields. It then fetches her Guid and PrimaryAliasId, applies the \"New Visitor\" Tag, and creates a new Workflow instance of the church's \"First Time Guest\" type (Id=24) with her card data as AttributeValues. `rock_sync_status` → `synced`.\n\n**David — new Person.**\n\nDavid has never been in Rock. Email search returns empty. Phone search returns empty. SaltLight posts to `/api/People`. Rock responds with `201` and a bare integer: `22`. David is now Rock Person Id=22 — status Active, connection status Visitor. SaltLight fetches his Guid and PrimaryAliasId, applies the Tag, creates the Workflow with his card data. `rock_sync_status` → `synced`.\n\n**Emily — Rock is down, retry succeeds.**\n\nRock's API is unreachable when Emily's card comes in. SaltLight writes `rock_sync_status = 'pending'`, `rock_sync_attempts = 1`. Emily's CareFlow proceeds immediately — welcome SMS goes out, leader thread fires. Two hours later, the retry sweep picks up her pending card, Rock is back up, and the sync completes. `rock_sync_status` → `synced`, `rock_sync_attempts = 2`.\n\n## Acceptance criteria\n\nAfter a successful card capture sync, verify against the live Rock API:\n\n- **Rock Person exists:** `GET /api/People?$filter=Email eq '{card_email}'` returns at least one record. New persons have `ConnectionStatusValueId` equal to `rock_meta['visitor_id']` and `RecordStatusValueId` equal to `rock_meta['active_status_id']`. (On the test env, these are `66` and `3` respectively — but never hardcode these values; always read from `account_metadata['rockrms']`.)\n- **Rock Tags applied:** For each `tag_id` in `writeback_tag_ids`, `GET /api/TaggedItems?$filter=TagId eq {tag_id} and EntityGuid eq '{person_guid}'` returns at least one `TaggedItem` row with `EntityTypeId=15` (Person). All configured tags must be applied.\n- **Rock Workflows created:** For each `wf_type_id` in `writeback_workflow_type_ids`, `GET /api/Workflows?$filter=WorkflowTypeId eq {wf_type_id} and InitiatorPersonAliasId eq {primary_alias_id} and CreatedDateTime gt datetime'{sync_started_at}'` returns the newly created workflow with `Status=\"Active\"`. One workflow instance per configured type. The `CreatedDateTime` filter prevents a false pass from pre-existing workflows for this person.\n- **Rock AttributeValues populated:** For each `(attribute_id, value)` pair derived from `account_metadata['rockrms']['mapped_forms']` (looked up by `workflow_type_id`), `GET /api/AttributeValues?$filter=EntityId eq {workflow_id} and AttributeId eq {attr_id}` returns a row with the expected string `Value`.\n- **DB state:** `rock_sync_status='synced'`, `rock_sync_attempts >= 1`, `rock_sync_last_attempted` is non-null.\n- **PATCH is additive:** When an existing Person is found, only non-blank card fields appear in the PATCH payload. Existing Rock values for fields the card left blank are preserved.\n- **Source guard:** Connect Cards with `source` in `{rock_track1, rock_track2, rock_webhook}` have `rock_sync_status = NULL` and are never pushed to Rock.\n- **No-identity guard:** Connect Cards with neither email nor phone have `rock_sync_status = NULL` — no ghost Person record appears in Rock.\n- **CareFlow independence:** If Rock sync fails, the CareFlow's downstream SaltLight steps still execute (welcome SMS sent, leader thread fired).\n- **Retry increments attempts:** Each poll cycle, pending cards are re-attempted and `rock_sync_attempts` increments by 1.\n- **Failure escalation:** After 10 total failed attempts, `rock_sync_status = 'failed'` and an alert fires to SaltLight's internal team channel.\n- **No demotion:** A `connect_card` row with `rock_sync_status = 'synced'` or `'failed'` is never flipped back to `'pending'`.\n\n---\n\n## Technical API contract\n\n### Rock API calls (in order)\n\nAll calls validated live against `saltlight.rockcloud.com` (Rock 18.1.0.0).\n\n**1. Email dedup**\n\n- `GET /api/People?$filter=Email eq '{email}'&$top=5&$select=Id,FirstName,LastName,PrimaryAliasId`\n- Used to find an existing Rock person by email before creating a new one.\n- Returns a bare JSON array. Empty array means no match.\n- **Gotcha:** OData requires escaping single quotes by doubling them. `o'malley@example.com` must be sent as `o''malley@example.com` in the filter, or the filter will be invalid and Rock returns 400.\n\n**2. Phone dedup** (only if email dedup misses)\n\n- `GET /api/People?$filter=PhoneNumbers/any(p: p/Number eq '{digits}')&$top=5&$select=Id,FirstName,LastName,PrimaryAliasId`\n- Strip phone to digits only (`5552011001`, no formatting, no `+1`).\n- Returns a bare JSON array. The OData `any` filter on the `PhoneNumbers` related collection is confirmed working on Rock 18.1.0.0.\n- **Gotcha:** Rock stores some phone numbers with the country code prefixed (`15552011001`). A 10-digit search will not match an 11-digit stored number. Document as a known limitation in v1.\n\n**3. Create Rock person** (only if both dedup searches miss)\n\n- `POST /api/People`\n- Payload fields (v1): `FirstName`, `LastName`, `Email`, `RecordTypeValueId`, `RecordStatusValueId` (use the `active_status_id` from `account_metadata['rockrms']`), `ConnectionStatusValueId` (use the `visitor_id` from `account_metadata['rockrms']`).\n- `RecordTypeValueId`: Resolve at connect time via `self._resolve_guid('36CF452D-9E4A-4CB3-ADD6-52D5BE61C5CB')` and cache as `account_metadata['rockrms']['person_record_type_id']`. The integer Id for this GUID varies by Rock installation — always resolve via the GUID lookup and read from `rock_meta['person_record_type_id']`; never hardcode the integer. **Verify** by running `GET /api/DefinedValues?$filter=Guid eq guid'36CF452D-9E4A-4CB3-ADD6-52D5BE61C5CB'&$select=Id` on `saltlight.rockcloud.com` before using.\n- **Response shape:** Rock returns a **bare integer** (the new Person Id, e.g. `20`) with HTTP 201. NOT `{\"Id\": 20}`. NOT a dict. Read the return value directly — do not call `.get('Id')` on it. Same pattern as `POST /api/Workflows`.\n- **Phone is NOT included in this payload.** Rock's People endpoint does not accept a direct phone field on create or update; phone numbers live on the separate `/api/PhoneNumbers` sub-resource. Phone-on-create is deferred to v2. v1 creates the person without phone and logs a warning if a phone was on the card.\n\n**4. Update Rock person** (only if dedup found a match)\n\n- `PATCH /api/People/{id}`\n- Payload: only the fields present on the card AND non-blank. Allowed fields: `FirstName`, `LastName`, `Email`. Phone is excluded (see #3).\n- Returns HTTP 204 with no body.\n- **Never overwrite with blanks.** Build the payload by including only fields where the card has a non-empty value.\n\n**5. Apply tags** (loop over `writeback_tag_ids` array)\n\n- Get the Rock person's Guid and PrimaryAliasId: `GET /api/People/{rock_person_id}?$select=Id,Guid,PrimaryAliasId`. Fetch this once and pass both values to both the tag step (step 5) and the workflow step (step 6) — do not repeat this Rock API call for each step.\n- For **each** `tag_id` in `cfg.get('writeback_tag_ids', [])`: `POST /api/TaggedItems` with payload `{\"TagId\": <tag_id>, \"EntityGuid\": \"<person_guid>\", \"EntityTypeId\": 15}`.\n- `EntityTypeId: 15` is the Person entity type and is required — omitting it returns HTTP 500.\n- Rock does NOT return 409 on duplicate tags — it creates a duplicate `TaggedItem` row (Rock deduplicates on display). Duplicate tags are harmless, so no pre-check needed.\n- If `writeback_tag_ids` is empty or absent, skip this step entirely.\n\n**6. Create workflow instances** (loop over `writeback_workflow_type_ids` array)\n\n- For **each** `wf_type_id` in `cfg.get('writeback_workflow_type_ids', [])`:\n- `POST /api/Workflows` with payload `{\"WorkflowTypeId\": <wf_type_id>, \"Name\": \"SaltLight Guest - Card Capture\", \"InitiatorPersonAliasId\": <primary_alias_id>, \"Status\": \"Active\"}`.\n- **Response shape:** bare integer (the new Workflow Id), HTTP 201. NOT a dict. Read directly.\n- Then set AttributeValues (step 7) for each created workflow instance.\n- If `writeback_workflow_type_ids` is empty or absent, skip this step entirely.\n\n**7. Set workflow attribute values**\n\nFor each `(attribute_id, value)` pair derived from the card data and the `attribute_ids` lookup from `account_metadata['rockrms']['mapped_forms']`:\n\n- Check whether an `AttributeValue` row already exists: `GET /api/AttributeValues?$filter=EntityId eq {workflow_id} and AttributeId eq {attribute_id}&$select=Id`. Returns a bare array.\n- If a row exists: `PATCH /api/AttributeValues/{id}` with payload `{\"Value\": \"<value as string>\"}`. Returns HTTP 204.\n- If no row exists: `POST /api/AttributeValues` with payload `{\"EntityId\": <workflow_id>, \"AttributeId\": <attribute_id>, \"Value\": \"<value as string>\"}`. Returns a bare integer (new AttributeValue Id), HTTP 201.\n- **Gotcha:** Rock creates AttributeValue rows lazily — they do NOT pre-exist on a newly created workflow. `POST /api/Workflows/{id}/SetAttributeValue` returns 404 on Rock 18.1.0.0; do not use it.\n- All values are sent as strings. Cast ints, IDs, and names with `str(value)`.\n\n### Field name migration note\n\n> **Kenneth:** The CareFlow Rock config (`workflow_data['rockrms']`) now stores `writeback_tag_ids` (int array) and `writeback_workflow_type_ids` (int array) — plural, array-valued. Any existing code that reads `writeback_tag_id` (singular int) or `writeback_workflow_type_id` (singular int) must be updated to iterate over the new array fields. The feature write-back loops in this spec use `cfg.get('writeback_tag_ids', [])` and `cfg.get('writeback_workflow_type_ids', [])`. If an existing field has the singular name in the DB for any existing CareFlow, a one-time migration is needed to rename and convert to arrays.\n\n### Source guard\n\nThe following `connect_card.connect_card_data.source` values mean the card originated from Rock and must never be pushed back (avoids an echo loop):\n\n- `rock_track1` (People poll)\n- `rock_track2` (Workflow poll)\n- `rock_webhook` (inbound webhook, reserved)\n\nCompare case-insensitively. Anything else (`card_capture`, `manual`, web form sources, etc.) is eligible for push.\n\n### DB state machine\n\n`connect_card.rock_sync_status` is a TEXT column with these states:\n\n| State | Meaning | Set by |\n|---|---|---|\n| `NULL` | Rock sync not applicable (no Rock integration, OR card source is Rock-originated, OR card has no email AND no phone) | Default; never updated for ineligible cards |\n| `'pending'` | Sync needed — initial attempt failed | Trigger function on Rock API failure |\n| `'synced'` | Sync completed successfully | Trigger function or retry sweep on success |\n| `'failed'` | Exceeded 10 total attempts — alert raised | Retry sweep when `attempts >= 10` |\n\n**Transitions:**\n\n- `NULL → pending`: first attempt failed. Set `rock_sync_attempts = 1`, `rock_sync_last_attempted = NOW()`.\n- `NULL → synced`: first attempt succeeded. Set `rock_sync_attempts = 1`, `rock_sync_last_attempted = NOW()`.\n- `pending → synced`: retry succeeded. Increment attempts, set last_attempted.\n- `pending → pending`: retry failed but attempts < 10. Increment attempts, set last_attempted.\n- `pending → failed`: retry failed and attempts >= 10. Increment attempts, set last_attempted, send alert.\n\n**Guard against demotion:** any UPDATE that flips status to `'pending'` MUST include `WHERE rock_sync_status IS NULL OR rock_sync_status = 'pending'`. A `'synced'` or `'failed'` card must never be silently flipped back to `'pending'` by a re-trigger.\n\n**Attempt counter semantics:** the initial trigger writes `rock_sync_attempts = 1` on failure (counting the just-failed attempt). Each retry reads the existing value, increments by 1, and writes back. The 10-attempt threshold is checked against the post-increment value: when the just-completed attempt was the 10th and it failed, status flips to `'failed'`.\n\n**New DB columns needed** (add via migration):\n\n```sql\nALTER TABLE public.connect_card\n  ADD COLUMN rock_sync_status TEXT DEFAULT NULL,\n  ADD COLUMN rock_sync_attempts INTEGER DEFAULT 0,\n  ADD COLUMN rock_sync_last_attempted TIMESTAMP WITH TIME ZONE DEFAULT NULL;\n```\n\n**Also add these indexes for dedup query performance:**\n\n```sql\nCREATE INDEX CONCURRENTLY idx_connect_card_rock_sync_status\n    ON public.connect_card (account_id, rock_sync_status)\n    WHERE rock_sync_status IS NOT NULL;\n```\n\nThis index supports the retry sweep's `WHERE account_id = %s AND rock_sync_status = 'pending'` query. The `WHERE IS NOT NULL` partial index keeps it small — most cards are never synced to Rock.\n\n### Trigger point\n\nThe sync fires inline at the end of `connect_card_item_processing()` in `tf/lambda_functions/ai_handler/src/connect_card_tools.py`, **after** `associate_card_to_workflow` has run. At that point both `connect_card_id` and `workflow_id` are in scope.\n\nSequence inside the trigger:\n\n1. Source guard — exit if `card_data['source']` is in `ROCK_SOURCES`.\n2. Identifying-info guard — exit if both email and phone are blank or missing. Log a warning. Leave `rock_sync_status = NULL`.\n3. Load the account's `account_metadata['rockrms']` via `self.get_connection()`. If not connected (returns None), exit (leave `rock_sync_status = NULL`).\n4. Load the CareFlow's `workflow_data['rockrms']` for this `workflow_id`. If no Rock config, exit (leave `rock_sync_status = NULL`). The `attribute_ids` for field mapping are in `account_metadata['rockrms']['mapped_forms']` (Feature 1b), looked up by `workflow_type_id`.\n5. Attempt the full sync (email dedup → phone dedup → create/update → tag → workflow → attribute values).\n6. On success: UPDATE `connect_card` SET `rock_sync_status = 'synced'`, `rock_sync_attempts = 1`, `rock_sync_last_attempted = NOW()` WHERE `connect_card_id = %s` AND (`rock_sync_status IS NULL OR rock_sync_status = 'pending'`).\n7. On failure: UPDATE same row to `rock_sync_status = 'pending'`, `rock_sync_attempts = 1`, `rock_sync_last_attempted = NOW()` (same WHERE guard). Log the exception. Do not raise — the CareFlow must proceed.\n\nThe sync runs synchronously in the calling Lambda. It is not dispatched to SQS in v1.\n\n### Retry sweep\n\nRuns at the end of `_poll_rock_account()` in the Rock poll Lambda, after both Track 1 and Track 2 loops complete.\n\n**Query for pending cards** (note: `workflow_id` lives on `interaction`, NOT on `connect_card` — JOIN through `interaction`):\n\n```sql\n-- DISTINCT ON prevents a card matched to multiple CareFlows from being synced\n-- multiple times per sweep cycle. Without it, one pending card with 3 CareFlows\n-- would appear 3 times and create 3 Rock workflow instances per sweep.\nSELECT DISTINCT ON (cc.connect_card_id)\n    cc.connect_card_id, cc.connect_card_data, cc.rock_sync_attempts, i.workflow_id\nFROM public.connect_card cc\nJOIN public.interaction i ON i.connect_card_id = cc.connect_card_id\nWHERE cc.account_id = %s\n  AND cc.rock_sync_status = 'pending'\nORDER BY cc.connect_card_id, cc.rock_sync_attempts DESC\nLIMIT 50;\n-- Note: DISTINCT ON requires the DISTINCT ON expression to appear first in ORDER BY.\n-- DESC on rock_sync_attempts means highest-attempt cards (closest to the failed threshold)\n-- are selected when multiple interaction rows exist for the same card.\n```\n\n`ORDER BY cc.connect_card_id, cc.rock_sync_attempts DESC` — `DISTINCT ON` collapses multiple interaction rows per card to one. `DESC` on attempts means the highest-attempt card is selected when duplicates exist, and the sweep processes cards closest to the alert threshold first.\n\n**For each pending card:**\n\n1. Re-attempt the full sync using the same code path as the initial trigger.\n2. Read current `rock_sync_attempts`, compute `new_attempts = attempts + 1`.\n3. On success: UPDATE `rock_sync_status = 'synced'`, `rock_sync_attempts = new_attempts`, `rock_sync_last_attempted = NOW()` WHERE `connect_card_id = %s AND (rock_sync_status IS NULL OR rock_sync_status = 'pending')`.\n4. On failure with `new_attempts < 10`: UPDATE `rock_sync_status = 'pending'`, `rock_sync_attempts = new_attempts`, `rock_sync_last_attempted = NOW()` WHERE `connect_card_id = %s AND (rock_sync_status IS NULL OR rock_sync_status = 'pending')`.\n5. On failure with `new_attempts >= 10`: UPDATE `rock_sync_status = 'failed'`, `rock_sync_attempts = new_attempts`, `rock_sync_last_attempted = NOW()` WHERE `connect_card_id = %s AND (rock_sync_status IS NULL OR rock_sync_status = 'pending')`, then emit an alert to the SaltLight internal team channel.\n\n   > **Alert mechanism:** Check the codebase for an existing alerting utility (look for `notify_internal_team()`, `send_ops_alert()`, or an SNS publish wrapper in `shared/utils/` or `shared/integrations/`). If one exists, call it with the message: `f\"Rock sync failed for {connect_card_id} after {new_attempts} attempts (account {account_id})\"`. If no utility exists, publish to the SNS topic used by other Lambda error alerts in the same environment — ask Kris or check the Lambda environment variables for an `OPS_SNS_TOPIC_ARN` or similar. Do NOT raise an exception or log only — the alert must reach the ops channel.\n\nThe retry function must be called with the `rock_meta` dict obtained via `self.get_connection()` on the integration base class. There is no `get_account_metadata()` helper on the base class; do not call it.\n\n### Poll schedule\n\nThe poll Lambda must check `_should_poll_now()` at the top of its handler. The schedule lives on `account_metadata['rockrms']['poll_schedule']`:\n\n```json\n{\n  \"high_frequency_days\": [5, 6],\n  \"high_frequency_start\": \"15:00\",\n  \"high_frequency_end\": \"21:00\",\n  \"low_frequency_interval_hours\": 12,\n  \"timezone\": \"America/Chicago\"\n}\n```\n\n- `high_frequency_days` uses Python `datetime.weekday()` values (Mon=0, Sun=6). `[5, 6]` is Sat/Sun.\n- During the high-frequency window on a high-frequency day, the poll runs every EventBridge tick (every 5 min in the EventBridge rule).\n- Outside that window, the poll runs only if `(now - last_polled) >= low_frequency_interval_hours`.\n\n**`_should_poll_now()` returns True/False.** It must be wired into the handler, not left as a comment. If False, the handler returns early without polling.\n\n**`last_polled` write-back:** at the end of every successful poll (including no-op polls), `_update_poll_cursor()` must update `account_metadata['rockrms']['last_polled']` alongside `poll_cursor_track1` and `poll_cursor_track2`. Without this, the low-frequency interval can never be calculated correctly.\n\n**Timezone — v1 vs v2:**\n\n- **v1:** stored times (`high_frequency_start`, `high_frequency_end`) and `last_polled` are in **UTC**. The `timezone` field is stored but unused. US churches think in local time, but v1 compares against `datetime.utcnow()`. Document this in the connect-time UI so admins enter UTC values.\n- **v2:** honor the `timezone` field. Convert `now` to the church's local time before comparing.\n\n### Known limitations (v2 items)\n\n- **Phone on create:** v1 cannot include phone in `POST /api/People`. Rock requires the `PhoneNumbers` sub-endpoint for phone changes. v2 will add a follow-up `POST /api/PhoneNumbers` after person create.\n- **Phone match by digits:** v1 phone dedup uses digit-only matching. If Rock stored the number with a country-code prefix (`15552011001`), a 10-digit card phone (`5552011001`) will not match. v2 may try both forms.\n- **Timezone:** v1 treats poll-schedule times and `last_polled` as UTC. v2 honors `poll_schedule['timezone']`.\n- **Partial-sync idempotency:** if person-create succeeds but Lambda times out before the tag or workflow is created, the retry will dedup-match the person (good), apply the tag again (harmless — Rock allows duplicate `TaggedItem` rows), and create a **second workflow instance** (BAD — duplicate workflow). v1 accepts this risk. v2 will store the created `rock_workflow_id` on `connect_card` after step 6 succeeds and skip workflow creation on retry if it's already set.\n- **Synchronous sync in trigger:** the full sync runs inline in the calling Lambda. If Rock is slow, the caller can approach timeout. v2 may dispatch to SQS FIFO for high-volume events.\n- **Partial-sync NULL-status gap:** If Lambda times out after the Rock sync succeeds (person created, tags applied, workflows created) but BEFORE the `UPDATE connect_card SET rock_sync_status = 'synced'` executes, `rock_sync_status` stays `NULL`. The retry sweep only picks up `'pending'` cards — a `NULL` card is invisible to it and will never be retried. The next inline trigger (if the card is re-submitted) will re-attempt via email dedup (finding the existing person), but if no re-submission happens, the card is silently un-synced. v2 mitigation: write `rock_sync_status = 'pending'` immediately before the Rock API calls begin (optimistic mark), then update to `'synced'` or leave as `'pending'` on completion.\n\n### Known gotchas\n\n- `POST /api/People` returns a **bare integer**, not a dict. Use the return value directly. Calling `.get('Id')` on an int will raise.\n- `POST /api/Workflows` returns a **bare integer** — same pattern.\n- `POST /api/AttributeValues` returns a **bare integer**.\n- `PATCH /api/People/{id}` and `PATCH /api/AttributeValues/{id}` return HTTP 204 with no body.\n- `POST /api/TaggedItems` requires `EntityTypeId: 15` for Person. Omitting it returns HTTP 500.\n- Rock does not return 409 on duplicate tags — it creates duplicate `TaggedItem` rows. No pre-check needed.\n- OData filters with single-quoted strings must escape internal apostrophes by doubling them (`o''malley`).\n- Phone dedup must strip the input to digits-only before building the filter.\n- `connect_card` does NOT have a `workflow_id` column. The retry sweep MUST JOIN through `interaction` to recover the workflow id for each pending card.\n- The integration base class exposes `self.get_connection()` (returns the `rockrms` sub-dict from `account_metadata`, or None). There is no `get_account_metadata()` helper — do not call it.\n\n---\n\n## Reference implementation (optional)\n\n> Kenneth — this is one way to wire the above. Skip if you prefer to write your own code.\n\n```python\n# shared/integrations/rockrms.py\n\ndef sync_saltlight_card_to_rock(\n    self,\n    connect_card_id: str,\n    workflow_id: str,\n    card_data: dict,\n) -> dict:\n    \"\"\"\n    Push a SaltLight-captured card to Rock. Idempotent for the dedup-match path;\n    see 'partial-sync idempotency' v2 note for the duplicate-workflow edge case.\n\n    Returns: {'success': bool, 'rock_person_id': int|None, 'rock_workflow_id': int|None}\n    Raises:  nothing — caller decides whether to mark pending or failed.\n    \"\"\"\n    # 1. Source guard\n    # 2. Identifying-info guard (email or phone required)\n    # 3. Load account connection: rock_meta = self.get_connection(); if not rock_meta: return failure result\n    # 4. Load CareFlow Rock config from workflow_data['rockrms']\n    # 5. Email dedup -> phone dedup -> create OR update person\n    # 6. For each tag_id in cfg.get('writeback_tag_ids', []): POST /api/TaggedItems\n    # 7. For each wf_type_id in cfg.get('writeback_workflow_type_ids', []): POST /api/Workflows + set AttributeValues\n    # 8. Return ids on success; raise on Rock API failures so caller can mark pending\n    ...\n\n\n# ai_handler/src/connect_card_tools.py — at end of connect_card_item_processing()\n\ndef _trigger_rock_sync_if_configured(connect_card_id, workflow_id, card_data, account_id):\n    \"\"\"\n    Inline trigger called after associate_card_to_workflow.\n    Catches all exceptions — Rock failure must never block the CareFlow.\n\n    DB writes:\n      - On success: UPDATE connect_card SET rock_sync_status='synced',\n            rock_sync_attempts=1, rock_sync_last_attempted=NOW()\n        WHERE connect_card_id=%s\n          AND (rock_sync_status IS NULL OR rock_sync_status='pending')\n\n      - On failure: same UPDATE but status='pending'\n    \"\"\"\n    ...\n\n\n# orchestrator/src/rockrms.py — end of _poll_rock_account()\n\ndef _retry_pending_rock_syncs(account_id, rock_meta):\n    \"\"\"\n    Picks up cards in 'pending' state, retries each, increments attempts,\n    marks 'failed' + alerts at attempts >= 10.\n\n    Query JOINs connect_card -> interaction to recover workflow_id.\n    Batch size: 50, ORDER BY cc.connect_card_id, cc.rock_sync_attempts DESC.\n    \"\"\"\n    ...\n\n\n# orchestrator/src/rockrms.py — top of rock_poll_handler\n\ndef _should_poll_now(rock_meta) -> bool:\n    \"\"\"\n    v1: compares datetime.utcnow() against poll_schedule times (treated as UTC).\n    v2: honor poll_schedule['timezone'].\n\n    Logic:\n      - If today's weekday() in high_frequency_days AND now within\n        [high_frequency_start, high_frequency_end]: return True\n      - Else: return (now - last_polled) >= low_frequency_interval_hours\n      - If last_polled is missing: return True (first poll)\n    \"\"\"\n    ...\n\n\ndef _update_poll_cursor(account_id, rock_meta, new_cursor_track1, new_cursor_track2):\n    \"\"\"\n    Updates poll_cursor_track1, poll_cursor_track2, AND last_polled\n    in account_metadata['rockrms'] in a single jsonb_set chain.\n    \"\"\"\n    ...\n```\n\n---\n\n## Implementation upgrade notes\n\n> **Kenneth — read this before modifying the existing `rockrms.py` implementation.** These are known bugs in the existing code that must be fixed as part of Feature 4:\n\n1. **`_create_rock_person()` — remove any `isinstance(response, dict)` check.** `POST /api/People` always returns a bare integer on Rock 18.1.0.0. Delete any branch that does `response.get('Id')` — calling `.get()` on an integer raises `AttributeError`. The return line must simply be `return response`.\n\n2. **`_create_rock_person()` — do NOT hardcode `RecordTypeValueId: 1` or `RecordStatusValueId: 3`.** These integer IDs are install-specific. Read them from `rock_meta['person_record_type_id']` and `rock_meta['active_status_id']` respectively (stored at connect time by Feature 1).\n\n3. **Do NOT call `self.get_account_metadata()` anywhere.** This method does not exist on the base integration class. Use `self.get_connection()` — it returns the `rockrms` sub-dict from `account_metadata`, or None if not connected.\n\n4. **`sync_saltlight_card_to_rock()` — read `attribute_ids` from `mapped_forms`, not from the CareFlow config.** If the existing code does `attribute_ids = careflow_rock_config.get('attribute_ids', {})`, that is the old architecture. Replace with the `form_map` lookup: `mapped_forms = rock_meta.get('mapped_forms', []); form_map = {f['workflow_type_id']: f['attribute_ids'] for f in mapped_forms}; attr_ids = form_map.get(cfg['workflow_type_id'])`.\n\n5. **`_trigger_rock_sync_if_configured()` — add demotion guard to the success update and the failure update.** Every UPDATE that sets `rock_sync_status` must include `WHERE rock_sync_status IS NULL OR rock_sync_status = 'pending'`. A card with `rock_sync_status = 'synced'` or `'failed'` must never be flipped back to `'pending'` by a re-trigger. Add this guard to both UPDATE statements.\n\n6. **`_retry_pending_rock_syncs()` — use the DISTINCT ON query with JOIN through `interaction`.** The `connect_card` table has no `workflow_id` column. Any query that does `SELECT cc.workflow_id FROM public.connect_card cc` will fail with column-not-found. Use the locked DISTINCT ON query shown in the \"Retry sweep\" section above.\n\n7. **`_retry_pending_rock_syncs()` — pass `rock_meta` (the sub-dict), not `account_metadata` (the full dict).** The function receives `rock_meta` from `_poll_rock_account`. Do not pass `account_metadata` and then do `account_metadata.get('rockrms', {})` inside — that nesting produces an empty dict because `account_metadata` at the call site is already the sub-dict.\n"}, {"label": "Rock API Reference", "content": "# Rock API Reference\n\n## Overview\n\nThis document is the canonical Rock RMS API reference for the SaltLight integration. It covers every Rock endpoint called across Features 1, 1b, 2, 3, and 4 — organized by resource type, not feature. The base URL for all calls is `https://{domain}/api/...` where `{domain}` is the church's Rock hostname stored in `account_metadata['rockrms']['domain']`. All requests authenticate via the `Authorization-Token` header using the admin's REST API key. Rock 18.1.0.0 is the confirmed target version (tested against `saltlight.rockcloud.com`).\n\n---\n\n## Reference Data\n\n### GUIDs (Portable Identifiers)\n\nThese GUIDs are the same on every Rock install. SaltLight resolves each one to its install-local integer ID at connect time and caches the result. **Never hardcode the integer** — always resolve via `_resolve_guid()` and read from `account_metadata['rockrms']`.\n\n| Concept | GUID | Test Env Integer | Cached As |\n|---|---|---|---|\n| Visitor ConnectionStatus | `B91BA046-BC1E-400C-B85D-638C1F4E0CE2` | `66` | `rock_meta['visitor_id']` |\n| Mobile PhoneType | `F1A30C23-EC3B-4BCD-8CBC-6928F15E7223` | `12` | `rock_meta['mobile_id']` |\n| Active RecordStatus | `618F906C-C33D-4FA3-8AEF-E58CB7B63F1E` | `3` | `rock_meta['active_status_id']` |\n| Person RecordType | `36CF452D-9E4A-4CB3-ADD6-52D5BE61C5CB` | verify on test env | `rock_meta['person_record_type_id']` |\n\n> ⚠️ **Verify Mobile PhoneType GUID** against `saltlight.rockcloud.com` before treating it as ground truth.\n> ⚠️ **Verify Person RecordType GUID** — run `GET /api/DefinedValues?$filter=Guid eq guid'36CF452D-9E4A-4CB3-ADD6-52D5BE61C5CB'&$select=Id` on test env.\n\n---\n\n### FieldTypeId Reference\n\nFieldTypeIds appear on Attribute records from `/api/Attributes`. SaltLight uses them to load filter values (Feature 2 Step 6) and interpret AttributeValues from Workflow submissions (Feature 3).\n\n| FieldTypeId | Type Name | How SaltLight Uses It |\n|---|---|---|\n| `1` | Text | Raw string. No transformation. Used for name/phone fields in Workflow AttributeValues. |\n| `5` | Single Select (DefinedValue) | Read `definedtypeguid` qualifier → resolve to DefinedTypeId → call `/api/DefinedValues?$filter=DefinedTypeId eq {id}` |\n| `6` | Value List | Parse pipe-delimited `values` qualifier string. Labels already human-readable — no lookup. |\n| `16` | Multi Select (DefinedValue) | Same as FieldTypeId 5 — resolve via `definedtypeguid`. |\n| `30` | Campus Picker | Value stores `Campus.Id` as string integer (e.g. `\"1\"`). Resolve name from `rock_meta['campuses']` — no Rock call. |\n| `53` | Campus Picker (alternate) | Same as FieldTypeId 30. No `definedtypeguid` qualifier — use cached campuses only. |\n| `71` | Email | Raw string. Identical to Text (FieldTypeId 1) in this integration. |\n\n---\n\n## Endpoints by Category\n\n---\n\n### People\n\n#### `GET /api/People/GetCurrentPerson`\n\n**Purpose:** Verify API key validity and that the backing Rock user has People read access. Used as the permissions probe during Feature 1 account connection.\n\n**Response:**\n- HTTP 200 — single Person object; key field: `Id`\n- HTTP 401 — valid key but user account lacks People read permissions\n\n---\n\n#### `GET /api/People` (list with OData filters)\n\n**Purpose A — Track 1 poll (Feature 3):** Fetch Person records modified after a cursor timestamp.\n\n```\nGET /api/People?$filter=ModifiedDateTime gt datetime'2026-05-24T15:00:00Z'\n    &$expand=PhoneNumbers\n    &$orderby=ModifiedDateTime asc\n    &$top=100\nAuthorization-Token: {api_key}\n```\n\n**Purpose B — Email dedup (Feature 4):**\n\n```\nGET /api/People?$filter=Email eq 'james.wilson@example.com'\n    &$top=5\n    &$select=Id,FirstName,LastName,PrimaryAliasId\nAuthorization-Token: {api_key}\n```\n\n> Escape apostrophes in email by doubling: `o'malley` → `o''malley`\n\n**Purpose C — Phone dedup (Feature 4):** (when email dedup returns nothing)\n\n```\nGET /api/People?$filter=PhoneNumbers/any(p: p/Number eq '5552011001')\n    &$top=5\n    &$select=Id,FirstName,LastName,PrimaryAliasId\nAuthorization-Token: {api_key}\n```\n\n> Phone number must be digits only — no formatting, no `+1`.\n\n**Response shape:** Bare JSON array `[...]` — run through `_to_list()`.\n\nKey fields per Person:\n\n| Field | Type | Notes |\n|---|---|---|\n| `Id` | int | Install-specific Person ID |\n| `FirstName`, `LastName` | string | |\n| `Email` | string | |\n| `PrimaryAliasId` | int | Required for tag and Workflow creation |\n| `PrimaryCampusId` | int\\|null | Scalar only — `$expand=Campus` silently ignored |\n| `ConnectionStatusValueId` | int | e.g. `66` = Visitor |\n| `ModifiedDateTime` | string | ISO-8601 UTC — Track 1 cursor |\n| `PhoneNumbers` | array | Only present with `$expand=PhoneNumbers`. Each: `{Number, NumberTypeValueId}`. `Number` is digits-only. |\n\n⚠️ Do **NOT** combine `$select` with `$expand=PhoneNumbers` — `$select` silently strips the PhoneNumbers collection.\n\n---\n\n#### `POST /api/People`\n\n**Purpose:** Create a new Rock Person when no email/phone match found. Used by Feature 4.\n\n**Request body:**\n\n```json\n{\n  \"FirstName\": \"James\",\n  \"LastName\": \"Wilson\",\n  \"Email\": \"james.wilson@example.com\",\n  \"RecordTypeValueId\": 1,\n  \"RecordStatusValueId\": 3,\n  \"ConnectionStatusValueId\": 66\n}\n```\n\n> Use `rock_meta['person_record_type_id']`, `rock_meta['active_status_id']`, `rock_meta['visitor_id']` — never hardcode integers.\n\n**Response:** Bare integer (new Person Id) with HTTP 201. ⚠️ NOT a dict — do NOT call `.get('Id')`.\n\n---\n\n#### `PATCH /api/People/{id}`\n\n**Purpose:** Update non-blank fields on existing Person. Used by Feature 4 after dedup match.\n\nAllowed fields: `FirstName`, `LastName`, `Email`. Phone excluded (v2 item). Never overwrite with blanks.\n\n**Response:** HTTP 204, no body.\n\n---\n\n#### `GET /api/People/{id}`\n\n**Purpose:** Fetch `Guid` and `PrimaryAliasId` after create or update. Both are needed for tags + Workflows — fetch once and reuse. ⚠️ `$select` ignored on single-record GETs.\n\n---\n\n### Person Aliases\n\n#### `GET /api/PersonAliases/{aliasId}`\n\n**Purpose:** Resolve a `PersonAliasId` to a `PersonId`. Used by Feature 3 Track 2 when `InitiatorPersonAliasId` is non-null.\n\n⚠️ All 5 test Workflow fixtures have `InitiatorPersonAliasId: null` — handle null gracefully in all code paths.\n\n---\n\n### Tags\n\n#### `GET /api/Tags`\n\n**Purpose:** Load Person Tags list for CareFlow Step 6 write-back multi-select. Used by Feature 2.\n\n```\nGET /api/Tags?$filter=EntityTypeId eq 15&$select=Id,Name&$orderby=Name asc\nAuthorization-Token: {api_key}\n```\n\n**Response:** Bare JSON array. Each element: `{Id, Name}`.\n\n---\n\n#### `POST /api/TaggedItems`\n\n**Purpose:** Apply a Tag to a Person at card capture. Called once per `tag_id` in `cfg.get('writeback_tag_ids', [])`. Used by Feature 4.\n\n```json\n{\n  \"TagId\": 42,\n  \"EntityGuid\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"EntityTypeId\": 15\n}\n```\n\n⚠️ `EntityTypeId: 15` is **required** — omitting it returns HTTP 500.\nℹ️ Rock silently creates duplicate rows on repeat applies — harmless.\n\n---\n\n### Workflows and Forms\n\n#### `GET /api/WorkflowTypes`\n\n**Purpose:** Load active Rock WorkflowTypes. Used by Feature 1b (form selection checklist) and Feature 2 (write-back Workflows multi-select — show ALL active types, not just mapped forms).\n\n```\nGET /api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Name&$orderby=Name asc\nAuthorization-Token: {api_key}\n```\n\n**Response:** Bare JSON array. Each element: `{Id, Name}`.\n\n---\n\n#### `GET /api/Workflows` (list — Track 2 poll)\n\n**Purpose:** Fetch completed Workflow instances for a configured WorkflowTypeId after a cursor. Used by Feature 3 Track 2.\n\n```\nGET /api/Workflows?$filter=WorkflowTypeId eq 24\n    and Status eq 'Completed'\n    and CreatedDateTime gt datetime'2026-05-24T15:00:00Z'\n    &$orderby=CreatedDateTime asc\n    &$top=100\nAuthorization-Token: {api_key}\n```\n\n**Response:** Bare JSON array. Key fields: `Id`, `WorkflowTypeId`, `Status`, `InitiatorPersonAliasId` (nullable), `CreatedDateTime`, `CampusId`.\n\n⚠️ Do NOT use `$expand=AttributeValues` on `/api/Workflows` — returns HTTP 400. Fetch AttributeValues separately via `/api/AttributeValues`.\n\n---\n\n#### `POST /api/Workflows`\n\n**Purpose:** Create a write-back Workflow at card capture. Called once per `wf_type_id` in `cfg.get('writeback_workflow_type_ids', [])`. Used by Feature 4.\n\n```json\n{\n  \"WorkflowTypeId\": 24,\n  \"Name\": \"SaltLight Guest - Card Capture\",\n  \"InitiatorPersonAliasId\": 47,\n  \"Status\": \"Active\"\n}\n```\n\n**Response:** Bare integer (new Workflow Id) with HTTP 201. ⚠️ NOT a dict.\n\n---\n\n### Attribute Values\n\n#### `GET /api/AttributeValues` (batch fetch — Feature 3)\n\n**Purpose:** Batch-fetch all AttributeValues for a set of AttributeIds across all Workflow instances in a Track 2 batch.\n\n```\nGET /api/AttributeValues?$filter=AttributeId eq 8281\n    or AttributeId eq 8282\n    or AttributeId eq 8283\n    or AttributeId eq 8284\n    or AttributeId eq 8285\n    &$select=AttributeId,EntityId,Value\n    &$top=5000\nAuthorization-Token: {api_key}\n```\n\n**Response:** Bare JSON array. Each: `{AttributeId, EntityId, Value}`. Group by `EntityId == wf['Id']`.\n\nValue formats: Text (1) = raw string, Value List (6) = human label, CampusPicker (30/53) = string integer like `\"1\"` → resolve via `rock_meta['campuses']`.\n\n---\n\n#### `GET /api/AttributeValues` (existence check — Feature 4)\n\n**Purpose:** Determine whether to POST (create) or PATCH (update) an AttributeValue for a workflow.\n\n```\nGET /api/AttributeValues?$filter=EntityId eq 7 and AttributeId eq 8281&$select=Id\nAuthorization-Token: {api_key}\n```\n\nEmpty array → POST. Non-empty → PATCH using returned `Id`.\n\n---\n\n#### `POST /api/AttributeValues`\n\n**Purpose:** Create AttributeValue on a Workflow. Rock does NOT pre-create these — always POST them.\n\n```json\n{\"EntityId\": 7, \"AttributeId\": 8281, \"Value\": \"James\"}\n```\n\nAll `Value` fields must be strings. **Response:** Bare integer with HTTP 201.\n\n⚠️ Do NOT use `POST /api/Workflows/{id}/SetAttributeValue` — returns 404 on Rock 18.1.0.0.\n\n---\n\n#### `PATCH /api/AttributeValues/{id}`\n\n**Purpose:** Update existing AttributeValue. Request body: `{\"Value\": \"James\"}`. **Response:** HTTP 204, no body.\n\n---\n\n### Reference Data\n\n#### `GET /api/DefinedValues`\n\n**Purpose A — GUID resolution at connect time:**\n\n```\nGET /api/DefinedValues?$filter=Guid eq guid'B91BA046-BC1E-400C-B85D-638C1F4E0CE2'&$select=Id\nAuthorization-Token: {api_key}\n```\n\n> The `guid'...'` prefix is **required** — bare UUID returns empty array. Empty array = GUID not found → fail the connection.\n\n**Purpose B — filter value loading (FieldTypeIds 5 and 16):**\n\n```\nGET /api/DefinedValues?$filter=DefinedTypeId eq {type_id}&$select=Id,Value&$orderby=Order asc\nAuthorization-Token: {api_key}\n```\n\nUse `Id` as stored filter `id`, `Value` as displayed `label`.\n\n---\n\n#### `GET /api/Attributes`\n\n**Purpose:** Load Attribute definitions for a WorkflowType. Used by Feature 1b (auto-suggest) and Feature 2 (filter attribute dropdown).\n\n```\nGET /api/Attributes?$filter=EntityTypeId eq 113\n    and EntityTypeQualifierColumn eq 'WorkflowTypeId'\n    and EntityTypeQualifierValue eq '24'\n    &$select=Id,Key,Name,FieldTypeId\nAuthorization-Token: {api_key}\n```\n\nEntityTypeId 113 = Workflow. **Response:** Bare JSON array. Each: `{Id, Key, Name, FieldTypeId}`.\n\n**Example response element:**\n```json\n{\"Id\": 8281, \"Key\": \"FirstName\", \"Name\": \"First Name\", \"FieldTypeId\": 1}\n```\n\n---\n\n#### `GET /api/Campuses`\n\n**Purpose:** Fetch and cache active campuses at connect time. Used by Feature 1.\n\n```\nGET /api/Campuses?$filter=IsActive eq true&$select=Id,Guid,Name,ShortCode\nAuthorization-Token: {api_key}\n```\n\n**Response:** Bare JSON array (NOT OData envelope). Run through `_to_list()`.\n\nSaltLight caches as `[{\"id\": 1, \"name\": \"Main Campus\"}, ...]` in `rock_meta['campuses']`. Confirmed test env: `[{Id:1, Name:\"Main Campus\"}, {Id:2, Name:\"North Campus\"}]`.\n\n---\n\n## Known Gotchas\n\n1. **All list endpoints return bare JSON arrays.** Live-tested on Rock 18.1.0.0: every list endpoint returns `[...]` — never the OData `{\"value\":[...]}` envelope. Always use `_to_list()`.\n\n2. **POST creates return bare integers, not dicts.** `POST /api/People`, `POST /api/Workflows`, `POST /api/AttributeValues` all return a bare integer (new record Id) with HTTP 201. Never call `.get('Id')` on these.\n\n3. **OData datetime filter requires `datetime'...'` wrapper.** Bare ISO-8601 in `$filter` returns HTTP 400. Always: `ModifiedDateTime gt datetime'2026-05-24T15:00:00Z'`.\n\n4. **OData GUID filter requires `guid'...'` prefix.** `Guid eq guid'618F906C-...'` — prefix required. Bare UUID returns empty array.\n\n5. **`$expand=Campus` on People is silently ignored.** No nested Campus object ever returned. Use `rock_meta['campuses']` only.\n\n6. **`$select` + `$expand=PhoneNumbers` silently strips PhoneNumbers.** Use `$expand=PhoneNumbers` alone when you need phone data.\n\n7. **`$expand=AttributeValues` on Workflows returns HTTP 400.** Always fetch via `/api/AttributeValues` separately.\n\n8. **CampusPicker AttributeValues are string integers, not names.** FieldTypeId 30/53 stores `\"1\"`, not `\"Main Campus\"`. Always resolve via `rock_meta['campuses']`.\n\n9. **Three distinct filter-value loading paths for Step 6.** FieldTypeIds 5/16: resolve `definedtypeguid` → `/api/DefinedValues`. FieldTypeId 6: parse pipe-delimited `values` qualifier. FieldTypeIds 30/53: use `rock_meta['campuses']` — no Rock call.\n\n10. **`POST /api/TaggedItems` requires `EntityTypeId: 15`.** Omitting returns HTTP 500. Duplicate applies silently create duplicate rows — harmless.\n\n11. **OData single-quoted strings require doubled apostrophes.** `o'malley@example.com` → `Email eq 'o''malley@example.com'`. Single apostrophe in filter value returns HTTP 400.\n\n12. **UTC timestamps must include the `Z` suffix.** Use `datetime.utcnow().isoformat() + 'Z'`. Without `'Z'`, cursor comparisons against timezone-aware datetimes raise `TypeError`.\n\n13. **`$select` is ignored on single-record GETs.** Always use `.get('FieldName')` defensively on single-record responses.\n\n14. **`POST /api/Workflows/{id}/SetAttributeValue` returns 404 on Rock 18.1.0.0.** Use check-then-POST-or-PATCH on `/api/AttributeValues` directly.\n"}];
+
+// ─── MARKDOWN PARSER ─────────────────────────────────────────────────────────
+function parseMarkdown(md) {
+  const lines = md.split('\n');
+  let html = '';
+  let i = 0;
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function inlineFormat(s) {
+    // Bold+italic ***text*** or ___text___
+    s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    s = s.replace(/___(.+?)___/g, '<strong><em>$1</em></strong>');
+    // Bold **text** or __text__
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Italic *text* or _text_ (not inside words)
+    s = s.replace(/(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, '<em>$1</em>');
+    s = s.replace(/(?<!\w)_(?!\s)([^_]+?)(?<!\s)_(?!\w)/g, '<em>$1</em>');
+    // Inline code `code`
+    s = s.replace(/`([^`]+)`/g, (_, c) => '<code>' + escHtml(c) + '</code>');
+    return s;
+  }
+
+  function processInline(s) {
+    return inlineFormat(escHtml(s));
+  }
+
+  // Slugify for anchor IDs
+  function slugify(text) {
+    return text.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  }
+
+  // Check if line is a table row
+  function isTableRow(line) {
+    return /^\s*\|/.test(line) && /\|\s*$/.test(line.trim() + (line.endsWith('|') ? '' : '|'));
+  }
+
+  // Actually just check for pipe
+  function looksLikeTable(line) {
+    return line.trim().startsWith('|') && line.includes('|', 1);
+  }
+
+  function isSeparatorRow(line) {
+    return /^\s*\|[\s\|\-:]+\|\s*$/.test(line);
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Fenced code block
+    if (/^```/.test(trimmed)) {
+      const lang = trimmed.slice(3).trim();
+      let code = '';
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i].trim())) {
+        code += lines[i] + '\n';
+        i++;
+      }
+      i++; // skip closing ```
+      // Remove trailing newline
+      code = code.replace(/\n$/, '');
+      const langLabel = lang ? `<span class="code-lang-label">${escHtml(lang)}</span>` : '';
+      html += `<pre>${langLabel}<code>${escHtml(code)}</code></pre>\n`;
+      continue;
+    }
+
+    // HR: --- or *** or ___
+    if (/^[-*_]{3,}\s*$/.test(trimmed)) {
+      html += '<hr>\n';
+      i++;
+      continue;
+    }
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const text = headingMatch[2];
+      const id = slugify(text);
+      html += `<h${level} id="${id}">${processInline(text)}</h${level}>\n`;
+      i++;
+      continue;
+    }
+
+    // Blockquote
+    if (trimmed.startsWith('>')) {
+      let bqLines = [];
+      while (i < lines.length && lines[i].trim().startsWith('>')) {
+        bqLines.push(lines[i].trim().replace(/^>\s?/, ''));
+        i++;
+      }
+      // Parse inner content as paragraphs
+      const inner = bqLines.join('\n');
+      const innerParsed = inner.split(/\n\n+/).map(p => {
+        const t = p.trim();
+        if (!t) return '';
+        return '<p>' + processInline(t.replace(/\n/g, ' ')) + '</p>';
+      }).join('');
+      html += `<blockquote>${innerParsed}</blockquote>\n`;
+      continue;
+    }
+
+    // Table
+    if (looksLikeTable(trimmed)) {
+      // Collect table lines
+      let tableLines = [];
+      while (i < lines.length && looksLikeTable(lines[i].trim())) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      if (tableLines.length >= 2) {
+        html += '<table>\n';
+        let inBody = false;
+        for (let ti = 0; ti < tableLines.length; ti++) {
+          const tl = tableLines[ti].trim();
+          if (isSeparatorRow(tl)) {
+            html += '<tbody>\n';
+            inBody = true;
+            continue;
+          }
+          const cells = tl.split('|').slice(1, -1).map(c => c.trim());
+          if (ti === 0 && !inBody) {
+            html += '<thead><tr>\n';
+            cells.forEach(c => { html += `  <th>${processInline(c)}</th>\n`; });
+            html += '</tr></thead>\n';
+          } else {
+            html += '<tr>\n';
+            cells.forEach(c => { html += `  <td>${processInline(c)}</td>\n`; });
+            html += '</tr>\n';
+          }
+        }
+        if (inBody) html += '</tbody>\n';
+        html += '</table>\n';
+      }
+      continue;
+    }
+
+    // Unordered list
+    if (/^[-*+]\s/.test(trimmed)) {
+      html += '<ul>\n';
+      while (i < lines.length) {
+        const lt = lines[i].trim();
+        if (/^[-*+]\s/.test(lt)) {
+          const text = lt.replace(/^[-*+]\s+/, '');
+          // Check for nested list on next line
+          let itemHtml = processInline(text);
+          let j = i + 1;
+          let nested = '';
+          // Handle simple nested lists (indented)
+          while (j < lines.length && /^(\s{2,}|\t)[-*+]\s/.test(lines[j])) {
+            const nt = lines[j].trim().replace(/^[-*+]\s+/, '');
+            nested += `<li>${processInline(nt)}</li>\n`;
+            j++;
+          }
+          if (nested) {
+            html += `<li>${itemHtml}<ul>\n${nested}</ul></li>\n`;
+            i = j;
+          } else {
+            html += `<li>${itemHtml}</li>\n`;
+            i++;
+          }
+        } else if (lt === '') {
+          i++;
+          // Check if next non-empty line continues list
+          let k = i;
+          while (k < lines.length && lines[k].trim() === '') k++;
+          if (k < lines.length && /^[-*+]\s/.test(lines[k].trim())) {
+            i = k;
+            continue;
+          }
+          break;
+        } else {
+          break;
+        }
+      }
+      html += '</ul>\n';
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\.\s/.test(trimmed)) {
+      html += '<ol>\n';
+      while (i < lines.length) {
+        const lt = lines[i].trim();
+        if (/^\d+\.\s/.test(lt)) {
+          const text = lt.replace(/^\d+\.\s+/, '');
+          html += `<li>${processInline(text)}</li>\n`;
+          i++;
+        } else if (lt === '') {
+          i++;
+          let k = i;
+          while (k < lines.length && lines[k].trim() === '') k++;
+          if (k < lines.length && /^\d+\.\s/.test(lines[k].trim())) {
+            i = k;
+            continue;
+          }
+          break;
+        } else {
+          break;
+        }
+      }
+      html += '</ol>\n';
+      continue;
+    }
+
+    // Empty line
+    if (trimmed === '') {
+      i++;
+      continue;
+    }
+
+    // Paragraph — collect consecutive non-special lines
+    let paraLines = [];
+    while (i < lines.length) {
+      const lt = lines[i].trim();
+      if (lt === '') break;
+      if (/^#{1,4}\s/.test(lt)) break;
+      if (/^```/.test(lt)) break;
+      if (/^[-*_]{3,}\s*$/.test(lt)) break;
+      if (looksLikeTable(lt)) break;
+      if (/^[-*+]\s/.test(lt)) break;
+      if (/^\d+\.\s/.test(lt)) break;
+      if (lt.startsWith('>')) break;
+      paraLines.push(lines[i]);
+      i++;
+    }
+    if (paraLines.length > 0) {
+      html += '<p>' + processInline(paraLines.join(' ').trim()) + '</p>\n';
+    }
+  }
+
+  return html;
+}
+
+// ─── EXTRACT H2s FROM RENDERED HTML ──────────────────────────────────────────
+function extractH2s(htmlStr) {
+  const results = [];
+  const re = /<h2 id="([^"]+)">(.+?)<\/h2>/g;
+  let m;
+  while ((m = re.exec(htmlStr)) !== null) {
+    // Strip inner HTML tags for display text
+    const text = m[2].replace(/<[^>]+>/g, '');
+    results.push({ id: m[1], text });
+  }
+  return results;
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let activeIndex = 0;
+const renderedCache = [];
+
+// Pre-render all sections
+SECTIONS.forEach((sec, idx) => {
+  renderedCache[idx] = parseMarkdown(sec.content);
+});
+
+// ─── BUILD SIDEBAR ────────────────────────────────────────────────────────────
+function buildSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.innerHTML = '';
+
+  SECTIONS.forEach((sec, idx) => {
+    const h2s = extractH2s(renderedCache[idx]);
+    const div = document.createElement('div');
+    div.className = 'nav-section';
+
+    const header = document.createElement('div');
+    header.className = 'nav-section-header' + (idx === activeIndex ? ' active' : '');
+    header.innerHTML = `<span class="nav-section-index">${(idx + 1)}.</span>${escapeForDisplay(sec.label)}`;
+    header.addEventListener('click', () => {
+      setActive(idx);
+    });
+    div.appendChild(header);
+
+    if (h2s.length > 0) {
+      const subList = document.createElement('div');
+      subList.className = 'nav-subitems' + (idx === activeIndex ? ' open' : '');
+      h2s.forEach(h2 => {
+        const item = document.createElement('span');
+        item.className = 'nav-subitem';
+        item.textContent = h2.text;
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (activeIndex !== idx) {
+            setActive(idx, () => scrollToId(h2.id));
+          } else {
+            scrollToId(h2.id);
+          }
+        });
+        subList.appendChild(item);
+      });
+      div.appendChild(subList);
+    }
+
+    sidebar.appendChild(div);
+  });
+}
+
+function escapeForDisplay(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    const wrap = document.getElementById('content-wrap');
+    const elTop = el.getBoundingClientRect().top + wrap.scrollTop - 80;
+    wrap.scrollTo({ top: elTop, behavior: 'smooth' });
+  }
+}
+
+// ─── SET ACTIVE SECTION ───────────────────────────────────────────────────────
+function setActive(idx, afterRender) {
+  activeIndex = idx;
+
+  // Update content
+  const contentEl = document.getElementById('content');
+  contentEl.innerHTML = renderedCache[idx];
+
+  // Scroll content to top
+  document.getElementById('content-wrap').scrollTo({ top: 0, behavior: 'instant' });
+
+  // Update topbar
+  document.getElementById('topbar-section').textContent = SECTIONS[idx].label;
+
+  // Rebuild sidebar highlighting
+  const headers = document.querySelectorAll('.nav-section-header');
+  const subLists = document.querySelectorAll('.nav-subitems');
+  headers.forEach((h, i) => {
+    h.classList.toggle('active', i === idx);
+  });
+  subLists.forEach((s, i) => {
+    s.classList.toggle('open', i === idx);
+  });
+
+  if (afterRender) {
+    requestAnimationFrame(() => requestAnimationFrame(afterRender));
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+buildSidebar();
+setActive(0);
+</script>
+</body>
+</html>
