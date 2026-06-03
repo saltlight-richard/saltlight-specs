@@ -316,8 +316,9 @@ The admin is in the CareFlow setup wizard and reaches **Step 6 ("Rock Connection
 **Question 2 — Optional submission filter (only pick up some guests)**
 1. After a mapped form is chosen, the admin may optionally narrow which submissions feed this CareFlow.
 2. The admin chooses a **trigger attribute** — one of the fields on the selected Rock form (its options come from the form-fields lookup for that WorkflowType).
-3. The admin then chooses one or more **trigger values** for that attribute. For a dropdown/defined-value/value-list field, the available values are fetched from the field-values lookup so the admin selects from real options rather than typing free text. Example: trigger attribute = "Interest Area" (AttributeId 8286 on the test instance), trigger values = ["Sunday Service"].
-4. With a filter set, Feature 3 ingestion only creates a Connect Card when the submission's trigger attribute matches one of the selected values. With no filter, every completed submission of that form flows in.
+3. SaltLight reads that field's Rock **`FieldTypeId`** (already returned by the form-fields lookup) and **auto-detects whether it is single-select** (one value per submission, like a dropdown) **or multi-select** (a guest can check several, like a checkbox group). It shows this as a **pre-filled, editable** choice — the same "Checkbox or Dropdown?" question the Planning Center wizard asks, but pre-answered from Rock's field type — so the admin can confirm or override it. The resolved choice is saved as **`trigger_match_mode`**: `"equals"` for single-select, `"any_of"` for multi-select.
+4. The admin then chooses one or more **trigger values** for that attribute. For a dropdown/defined-value/value-list field, the available values are fetched from the field-values lookup so the admin selects from real options rather than typing free text. Example: trigger attribute = "Interest Area" (AttributeId 8286 on the test instance), trigger values = ["Sunday Service"].
+5. With a filter set, Feature 3 ingestion only creates a Connect Card when the submission's trigger attribute matches the selected values — **exact match** when `trigger_match_mode` is `"equals"`, or **"any selected value intersects the allowed set"** when it is `"any_of"`. With no filter, every completed submission of that form flows in.
 
 **Question 3 — Optional write-back (what fires in Rock when SaltLight captures a card)**
 1. The admin may optionally choose what SaltLight should do **in Rock** when this CareFlow captures a non-Rock guest (a scanned/manual card — handled by Feature 4).
@@ -333,11 +334,12 @@ The admin is in the CareFlow setup wizard and reaches **Step 6 ("Rock Connection
 - [ ] Step 6 lists only forms that were already mapped in Feature 1b (read from `account_metadata['rockrms']['mapped_forms']`); it does not let the admin map fields here.
 - [ ] Selecting a mapped form and saving stores a single-element array under `workflow_data['rockrms']` whose element carries the form's WorkflowType id in `workflow_type_id`.
 - [ ] The trigger attribute dropdown is populated from the selected form's fields (the Attributes lookup); the trigger-values multi-select is populated from that attribute's real option values (not free text) when the field is a dropdown / defined-value / value-list type.
-- [ ] When a submission filter is set, saving stores `trigger_attribute_id` plus a `trigger_values` array of one or more strings; with no filter, those keys are absent or empty and every submission of the form qualifies.
+- [ ] When a submission filter is set, saving stores `trigger_attribute_id`, a `trigger_match_mode` of `"equals"` or `"any_of"`, plus a `trigger_values` array of one or more strings; with no filter, those keys are absent or empty and every submission of the form qualifies.
+- [ ] When a trigger attribute is chosen, SaltLight auto-detects single- vs multi-select from the field's `FieldTypeId`, displays it pre-filled and editable (the "Checkbox or Dropdown?" choice), and saves the resolved value as `trigger_match_mode`; the admin can override the auto-detection before saving.
 - [ ] The write-back tag selector is a multi-select populated from the Tags lookup (Person tags only, `EntityTypeId eq 15`); saving stores an array of tag ids in `writeback_tag_ids`.
 - [ ] The write-back workflow-type selector is a multi-select populated from the WorkflowTypes lookup; saving stores an array of WorkflowType ids in `writeback_workflow_type_ids`.
 - [ ] Filter and write-back are independently optional — any combination saves cleanly, and a fully blank Step 6 leaves the CareFlow with no Rock connection.
-- [ ] If a campus-type field is chosen as the trigger attribute, the multi-select displays campus names but persists each campus **Id as a string** (e.g. `"1"`), so Feature 3's exact-string comparison matches what Rock stores.
+- [ ] If a campus-type field is chosen as the trigger attribute, the multi-select displays campus names but persists each campus **Id as a string** (e.g. `"1"`); a campus field is single-select (`trigger_match_mode: "equals"`), so Feature 3's exact-string comparison matches what Rock stores.
 - [ ] Re-opening Step 6 after a save shows the previously selected form, filter values, tags, and workflow types exactly as stored.
 
 ### What the backend touches
@@ -372,6 +374,7 @@ General references: [Rock REST API overview](https://community.rockrms.com/devel
   {
     "workflow_type_id": 24,
     "trigger_attribute_id": 8286,
+    "trigger_match_mode": "equals",
     "trigger_values": ["Sunday Service"],
     "writeback_tag_ids": [1],
     "writeback_workflow_type_ids": [24]
@@ -380,7 +383,7 @@ General references: [Rock REST API overview](https://community.rockrms.com/devel
 ```
 
 - `workflow_type_id` — the mapped form chosen in Question 1 (the WorkflowType id; 24 = "First Time Guest - SaltLight" on the test instance).
-- `trigger_attribute_id` / `trigger_values` — Question 2; both absent or empty means "pick up every submission of this form." `trigger_values` is always an array of strings (store the Campus Id-string for a campus field, e.g. `"1"`). InterestArea (AttributeId 8286) is Feature 2's optional trigger field — it is NOT one of the five mapped core fields.
+- `trigger_attribute_id` / `trigger_match_mode` / `trigger_values` — Question 2; all absent or empty means "pick up every submission of this form." `trigger_match_mode` is `"equals"` (single-select field) or `"any_of"` (multi-select/checkbox field), auto-detected from the attribute's `FieldTypeId` and admin-confirmable; Feature 3 reads it to choose exact-match vs intersection-match. `trigger_values` is always an array of strings (store the Campus Id-string for a campus field, e.g. `"1"`). InterestArea (AttributeId 8286) is Feature 2's optional trigger field — it is NOT one of the five mapped core fields.
 - `writeback_tag_ids` / `writeback_workflow_type_ids` — Question 3; multi-select arrays; both optional. Empty/absent means no write-back. These are consumed by Feature 4. (Tag Id 1 = "Staff", WorkflowType 24 on the test instance.)
 
 > **Key-name note for Kenneth:** Feature 2 uses the **plural, array** keys `writeback_tag_ids` and `writeback_workflow_type_ids` because write-back is multi-select (confirmed in the corrected guidance). These supersede any singular `writeback_tag_id` / `writeback_workflow_type_id` shown in earlier draft schema sections. Feature 4 must read the plural array keys.
@@ -444,7 +447,7 @@ This feature is a single scheduled Lambda that polls Rock on a schedule and inge
 2. For each mapped WorkflowType, the poller fetches **completed** Workflow instances of that type whose `CreatedDateTime` is greater than the Track 2 cursor, ordered by `CreatedDateTime` ascending. `Status eq 'Completed'` goes **in the `$filter`** alongside `WorkflowTypeId` and `CreatedDateTime` — this is verified working on Rock 18.1.0.0 (confirmed 2026-06-02 returning workflows 8/9/10), so there is no in-memory status pass. (Each WorkflowType is polled once per cycle even if several CareFlows reference it.)
 3. Because Rock will not return a workflow's field values inline (`$expand=AttributeValues` is rejected with HTTP 400), the poller then makes a **batch fetch** of `/api/AttributeValues` for all relevant attribute ids, and **joins the values to their workflows in memory** by `EntityId` (= the workflow id).
 4. For each workflow, the poller **dedups by Rock workflow id** — if a Connect Card already exists for that `rock_workflow_id`, skip it.
-5. Using the Feature 1b field mapping (`account_metadata['rockrms']['mapped_forms']`), the poller reads first name, last name, email, phone and campus off the joined attribute values, plus the CareFlow's trigger field (Feature 2). A CampusPicker value arrives as the Campus **Id as a string** (e.g. `"1"`) and must be resolved to a name through the campus cache. If the CareFlow defines a submission filter (trigger field + allowed values) and this submission's trigger value is not in the allowed set, skip it.
+5. Using the Feature 1b field mapping (`account_metadata['rockrms']['mapped_forms']`), the poller reads first name, last name, email, phone and campus off the joined attribute values, plus the CareFlow's trigger field (Feature 2). A CampusPicker value arrives as the Campus **Id as a string** (e.g. `"1"`) and must be resolved to a name through the campus cache. If the CareFlow defines a submission filter (trigger field + allowed values), apply it using the CareFlow's **`trigger_match_mode`**: for `"equals"` (single-select fields) the submission's single trigger value must equal one of the allowed values; for `"any_of"` (multi-select/checkbox fields, where Rock stores several selections in one delimited attribute value) split the stored value and keep the submission if **any** selected value is in the allowed set. If nothing matches, skip the submission.
 6. A surviving workflow becomes a Connect Card tagged `source: "rock_track2"`, matched to the CareFlow, and the CareFlow begins.
 7. After all mapped types are processed, the Track 2 cursor advances to the **maximum `CreatedDateTime`** seen this run (accumulated across all WorkflowTypes, written once at the end).
 
@@ -462,7 +465,7 @@ This feature is a single scheduled Lambda that polls Rock on a schedule and inge
 - [ ] Track 2 filters and sorts by `CreatedDateTime`, includes `Status eq 'Completed'` in the `$filter`, and its cursor advances to the maximum `CreatedDateTime` seen.
 - [ ] Track 2 reads each submission's fields via a batched `/api/AttributeValues` call joined in memory by `EntityId`; the run never uses `$expand=AttributeValues`.
 - [ ] A Track 2 CampusPicker value (Campus Id as a string, e.g. `"1"`) is resolved to a campus name via the cached campuses before being stored on the Connect Card.
-- [ ] When a CareFlow defines a trigger field + allowed values, only submissions whose trigger value matches are turned into Connect Cards.
+- [ ] When a CareFlow defines a trigger field + allowed values, only matching submissions become Connect Cards — **exact match** for a single-select trigger (`trigger_match_mode: "equals"`) and an **intersection match** for a multi-select trigger (`trigger_match_mode: "any_of"`, where the guest's checked values are split and any overlap with the allowed set qualifies). A guest who checks several boxes including an allowed one still qualifies.
 - [ ] If Rock is unreachable for one account, that account is logged and skipped, other accounts still poll, the Lambda does not crash, and the failed account's cursor is not advanced.
 - [ ] Every Connect Card created here carries a Rock source tag (`rock_track1` / `rock_track2`), and nothing in this feature writes to Rock. (No `rock_webhook` card is created in v1 — that source is reserved for a future webhook path.)
 
@@ -580,6 +583,7 @@ Test data ready to pull (created 2026-06-02 on `saltlight.rockcloud.com`, Rock 1
 - **Never use `$expand=AttributeValues` on `/api/Workflows`** — it returns HTTP 400 always. Track 2 must do the separate batched `/api/AttributeValues` call and join by `EntityId` in memory.
 - **Batch the AttributeValues call by AttributeId, not by EntityId.** Filtering by EntityId (workflow id) makes the URL grow without bound and exceed server limits at scale; fetch by the small fixed set of attribute ids (`(AttributeId eq 8281 or … or AttributeId eq 8286)`) and join to workflows client-side.
 - **CampusPicker stores the Campus Id as a string** (e.g. `"1"`), not the campus name — resolve it through the campus cache to get a name.
+- **A multi-select (checkbox) trigger field stores several selections in one delimited AttributeValue** — when the CareFlow's `trigger_match_mode` is `"any_of"`, split the stored value and test for set intersection with the allowed values, never an exact string compare, or a guest who checked extra boxes is silently skipped. The exact delimiter Rock writes for a multi-select value is **Kenneth-verify** (the loaded test data is single-valued); confirm it against a live multi-select submission before relying on the split character.
 - **`PrimaryCampusId` is often null on this install** and `$expand=Campus` on People is silently ignored (campus lives in the Family Group model). Read campus defensively; a Track 1 card may have no campus.
 - **Single-record GETs ignore `$select`** (they return the full object) — read individual fields defensively rather than assuming a trimmed shape.
 - **`$top=500` is the per-call ceiling** for People/Workflows (`$top=5000` for the AttributeValues batch). If exactly 500 records come back, records sharing the boundary second may be missed this cycle; the next cycle's cursor catches them. Acceptable at current scale.
