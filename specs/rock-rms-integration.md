@@ -24,7 +24,7 @@ Every feature section opens with a breadcrumb so you always know where you are:
 
 - **🧭** = you are here (top-of-section locator).
 - **Track 1 / Track 2** subheads (Feature 3) = the two independent ingestion paths.
-- **Side A / Side B** subheads (Feature 2) = inbound config vs. write-back config.
+- **Section A / Section B** subheads (Feature 2) = inbound (Rock form → CareFlow) vs. outbound (SaltLight card → Rock) config.
 - A checkbox `- [ ]` in Acceptance criteria = a thing a tester (Richard or you) must be able to observe.
 - Code fences appear in this document **only** to show data shapes — an example API request/response body, or a stored JSONB config blob. They never contain logic. If you see a fence, it is data, not an instruction to copy code.
 
@@ -68,11 +68,11 @@ Build and test the features **in this order**. Each one depends on the data or b
 **Test:** map WorkflowType 24's attributes (8281–8285) and confirm `mapped_forms` holds the mapping. Verify the field-values dropdown resolves InterestArea (8286) options.
 
 ### Feature 2 — CareFlow Rock Configuration (Step 6) *(build third)*
-**Why third:** Feature 2 lets an admin point a specific CareFlow at a **mapped** form (from 1b) and optionally configure a submission filter and write-back (tags + workflow types). It can't reference a mapped form that doesn't exist, so 1b must land first. It produces `workflow_data['rockrms']`, which is the config Feature 3 (which form to poll, which filter to apply) and Feature 4 (which tag/workflow to write back) both consume.
-**Test:** attach WorkflowType 24 to a CareFlow with a trigger filter (InterestArea = Sunday Service) and a write-back tag (Id 1); confirm `workflow_data['rockrms']` persists the config.
+**Why third:** Feature 2 lets an admin point a specific CareFlow at a **mapped** form (from 1b), set the **required triggering selection**, and optionally configure write-back (tags + workflow types). It can't reference a mapped form that doesn't exist, so 1b must land first. It produces `workflow_data['rockrms']`, which is the config Feature 3 (which form to poll, which selection triggers) and Feature 4 (which tag/workflow to write back) both consume.
+**Test:** attach WorkflowType 24 to a CareFlow with the required triggering selection (InterestArea = Sunday Service) and a write-back tag (Id 1); confirm `workflow_data['rockrms']` persists the config.
 
 ### Feature 3 — Guest Intake: Rock → SaltLight (ingestion only) *(build fourth)*
-**Why fourth:** ingestion is the first feature that actually *runs the loop*, and it needs all three prior features in place — a connected account (1), a form mapping to read values through (1b), and at least one CareFlow pointed at a form with an optional filter (2). It creates Connect Cards from Rock and manages the poll cursors. It does **not** write back. Ingestion is **polling only**: Track 1 reads new/updated People by `ModifiedDateTime`; Track 2 reads Completed Workflow instances by `CreatedDateTime`. There is no webhook path in v1.
+**Why fourth:** ingestion is the first feature that actually *runs the loop*, and it needs all three prior features in place — a connected account (1), a form mapping to read values through (1b), and at least one CareFlow pointed at a form with its triggering selection set (2). It creates Connect Cards from Rock and manages the poll cursors. It does **not** write back. Ingestion is **polling only**: Track 1 reads new/updated People by `ModifiedDateTime`; Track 2 reads Completed Workflow instances by `CreatedDateTime`. There is no webhook path in v1.
 **Test:** with the loaded test data (People 22–24, Workflows 8–10) and cursor `2026-06-02T12:11:00`, run the poller; confirm 3 Track-1 Connect Cards and 3 Track-2 Connect Cards appear, no duplicates, and both cursors advance.
 
 ### Feature 4 — Card Capture Push: SaltLight → Rock (write-back only) *(build last)*
@@ -232,7 +232,7 @@ Re-running setup for a form the admin already mapped should re-load the form's f
 - [ ] Re-saving a form that is already mapped updates the existing entry in place (matched by `workflow_type_id`) — it does not create a second entry for the same form.
 - [ ] The same saved mapping is used by every CareFlow that references the form; the admin never re-maps fields inside a CareFlow (Feature 2 only points at a mapped form, it does not store field ids).
 - [ ] Saved Rock field ids are stored as integers (Rock AttributeIds), matching what the Rock API returns.
-- [ ] **Live test-data check:** mapping WorkflowType `24` ("First Time Guest - SaltLight") on the test install and accepting the suggested fields persists `attribute_ids` of exactly `{first_name:8281, last_name:8282, email:8283, phone:8284, campus:8285}`. (`InterestArea` `8286` is Feature 2's optional trigger field, NOT one of the five mapped core fields.)
+- [ ] **Live test-data check:** mapping WorkflowType `24` ("First Time Guest - SaltLight") on the test install and accepting the suggested fields persists `attribute_ids` of exactly `{first_name:8281, last_name:8282, email:8283, phone:8284, campus:8285}`. (`InterestArea` `8286` is Feature 2's trigger field, NOT one of the five mapped core fields.)
 
 ### What the backend touches
 - **Handler / Lambda:** the Rock forms endpoints in the orchestrator Rock handler (`orchestrator/src/rockrms.py`) — these serve the portal's form picker, the per-form field list, and (where a field is a dropdown/single-select) its option values. The same handler dispatches all three based on which query params are present.
@@ -254,7 +254,7 @@ The Swagger explorer at `https://saltlight.rockcloud.com/api/docs` is a single l
 | Rock REST/OData conventions | $filter, $select, $orderby on `/api/{Entity}` | — | [Rock REST API overview](https://community.rockrms.com/developer/rock-api) · [Rock developer hub](https://community.rockrms.com/developer) |
 | Canonical spec hub | — | — | [Rock RMS spec hub](https://saltlight-richard.github.io/saltlight-specs/specs/rock-rms.html) |
 
-**Test data to drive a real mapping (already live, per Test Env doc):** WorkflowType `24` = "First Time Guest - SaltLight", with AttributeIds FirstName `8281`, LastName `8282`, Email `8283`, Phone `8284`, Campus `8285`, InterestArea `8286`. A correct save of form 24 should produce `attribute_ids` of `{first_name:8281, last_name:8282, email:8283, phone:8284, campus:8285}` — `InterestArea` `8286` is Feature 2's optional trigger field and is deliberately not one of the five mapped core fields. (Campuses on this install: `1` = Main, `2` = North.)
+**Test data to drive a real mapping (already live, per Test Env doc):** WorkflowType `24` = "First Time Guest - SaltLight", with AttributeIds FirstName `8281`, LastName `8282`, Email `8283`, Phone `8284`, Campus `8285`, InterestArea `8286`. A correct save of form 24 should produce `attribute_ids` of `{first_name:8281, last_name:8282, email:8283, phone:8284, campus:8285}` — `InterestArea` `8286` is Feature 2's trigger field and is deliberately not one of the five mapped core fields. (Campuses on this install: `1` = Main, `2` = North.)
 
 **Stored config shape** — written to `account_metadata['rockrms']['mapped_forms']` (an array; one entry per mapped form):
 
@@ -299,54 +299,69 @@ The Swagger explorer at `https://saltlight.rockcloud.com/api/docs` is a single l
 
 > 🧭 Rock RMS Integration › Feature 2 — CareFlow Rock Configuration (Step 6)
 
-This is **per-CareFlow** configuration. It is a thin layer on top of Feature 1b: Feature 1b maps a Rock form's fields to SaltLight fields **once, at the account level**; Feature 2 lets an admin attach one of those already-mapped forms to a **specific CareFlow** and answer three questions. There is **no field mapping in this feature** — Step 6 never asks "which Rock field is the email?" That lives in Feature 1b. Step 6 only asks: which mapped form, an optional filter, and an optional write-back.
+This is **per-CareFlow** configuration. It is a thin layer on top of Feature 1b: Feature 1b maps a Rock form's fields to SaltLight fields **once, at the account level**; Feature 2 connects a **specific CareFlow** to Rock in two directions. There is **no field mapping in this feature** — Step 6 never asks "which Rock field is the email?" That lives in Feature 1b. Step 6 has two parts: **Section A (inbound)** — which mapped form and which selection on it triggers this CareFlow (both required) — and **Section B (outbound)** — when a card originates in SaltLight, which Rock workflow to write the guest into, plus optional tags (always shown, optional).
 
 ### User story
-As a church admin, I want to attach a mapped Rock form to a specific CareFlow — and optionally filter which submissions it picks up and optionally choose what to write back to Rock — so that the right guests flow into the right CareFlow and my Rock database stays correctly attributed without any field-by-field setup here.
+As a church admin, I want to attach a mapped Rock form to a specific CareFlow **and specify which selection on that form triggers it** — and optionally choose what to write back to Rock — so that a guest who makes that selection (e.g. checks "Accepted Jesus") lands in the right CareFlow, and my Rock database stays correctly attributed, without any field-by-field setup here.
 
 ### User journey
 
-The admin is in the CareFlow setup wizard and reaches **Step 6 ("Rock Connection")**. The screen presents three questions. Only the first is required; the other two are optional.
+The admin is in the CareFlow setup wizard and reaches **Step 6 ("Rock Connection")**. It has two clearly-labeled sections, one per direction data can flow — the same split the Planning Center wizard uses ("PCO Form Submissions" vs "Physical Cards & Manual Entry"):
 
-**Question 1 — Which mapped form? (required to enable Rock for this CareFlow)**
+- **Section A — Inbound:** a Rock form submission starts this CareFlow. Both questions here are **required** (the selection is how a submission routes to the right CareFlow).
+- **Section B — Outbound:** a connect card that originates in SaltLight (card scan or manual entry) is pushed into Rock. Always shown, but optional.
+
+#### Section A — Inbound (a Rock form submission starts this CareFlow)
+
+**A1 — Which mapped form? (required to enable Rock for this CareFlow)**
 1. The screen loads the church's **mapped forms** — the Rock forms that were already mapped at the account level in Feature 1b. (These are read from `account_metadata['rockrms']['mapped_forms']`; the underlying list of available Rock forms comes from the WorkflowTypes lookup endpoint.)
 2. The admin picks one mapped form (e.g. "First Time Guest - SaltLight", WorkflowType Id 24 on the test instance). This binds the CareFlow to that form's WorkflowType.
 3. If the admin picks nothing and saves, the CareFlow simply has no Rock connection — it works normally without Rock. A church with no Rock integration leaves Step 6 blank.
 
-**Question 2 — Optional submission filter (only pick up some guests)**
-1. After a mapped form is chosen, the admin may optionally narrow which submissions feed this CareFlow.
-2. The admin chooses a **trigger attribute** — one of the fields on the selected Rock form (its options come from the form-fields lookup for that WorkflowType).
+**A2 — Which selection triggers this CareFlow? (required)**
+1. A connect-card form usually asks the guest to make a selection — e.g. "How can we best connect with you?" with options like *Connect Groups, Serve Teams, Baptism, Accepted Jesus*. **This question tells SaltLight which selection fires this CareFlow.** It is required: without it, the system can't know that an "Accepted Jesus" submission belongs to the "Accepted Jesus" CareFlow, and the CareFlow would fire on *every* submission of that form regardless of what the guest picked — which is wrong.
+2. The admin chooses the **trigger field** — the question on the form that carries the selection (e.g. "How can we best connect with you?"). Its options come from the form-fields lookup for that WorkflowType.
 3. SaltLight reads that field's Rock **`FieldTypeId`** (already returned by the form-fields lookup) and **auto-detects whether it is single-select** (one value per submission, like a dropdown) **or multi-select** (a guest can check several, like a checkbox group). It shows this as a **pre-filled, editable** choice — the same "Checkbox or Dropdown?" question the Planning Center wizard asks, but pre-answered from Rock's field type — so the admin can confirm or override it. The resolved choice is saved as **`trigger_match_mode`**: `"equals"` for single-select, `"any_of"` for multi-select.
-4. The admin then chooses one or more **trigger values** for that attribute. For a dropdown/defined-value/value-list field, the available values are fetched from the field-values lookup so the admin selects from real options rather than typing free text. Example: trigger attribute = "Interest Area" (AttributeId 8286 on the test instance), trigger values = ["Sunday Service"].
-5. With a filter set, Feature 3 ingestion only creates a Connect Card when the submission's trigger attribute matches the selected values — **exact match** when `trigger_match_mode` is `"equals"`, or **"any selected value intersects the allowed set"** when it is `"any_of"`. With no filter, every completed submission of that form flows in.
+4. SaltLight populates that field's **real options**, and the admin **checks the selection(s) that should fire this CareFlow** (e.g. "Accepted Jesus") — chosen from real values, never free text. These are saved as `trigger_values`. Example: trigger field = "Interest Area" (AttributeId 8286 on the test instance), selection = ["Sunday Service"].
+5. At ingestion (Feature 3), a submission becomes a Connect Card for this CareFlow **only when its selection matches** — **exact match** when `trigger_match_mode` is `"equals"`, or **"any checked value is in the selected set"** when it is `"any_of"`.
 
-**Question 3 — Optional write-back (what fires in Rock when SaltLight captures a card)**
-1. The admin may optionally choose what SaltLight should do **in Rock** when this CareFlow captures a non-Rock guest (a scanned/manual card — handled by Feature 4).
-2. **Tags:** a **multi-select** of Rock person Tag ids (options from the Tags lookup endpoint). Example: [1] (Tag Id 1 = "Staff" on the test instance).
-3. **Workflow types:** a **multi-select** of Rock WorkflowType ids to launch in Rock for that person (options from the WorkflowTypes lookup endpoint). Example: [24].
-4. Both are independent and both are optional. If neither is chosen, no write-back happens for cards captured into this CareFlow.
+#### Section B — Outbound (a SaltLight-originated card is written into Rock)
+
+When a connect card **originates in SaltLight** — scanned with CardCapture or entered by hand — SaltLight can push that guest into Rock. This section is **always shown but optional**: choose what should happen in Rock, or leave it empty to push nothing. (The push itself is performed by Feature 4 — Section B only stores the choices.)
+
+**B1 — Which Rock workflow should we write the guest into?**
+1. A **multi-select** of Rock WorkflowType ids (options from the WorkflowTypes lookup endpoint). For each one chosen, Feature 4 creates a Workflow instance of that type for the guest and fills in their fields. Saved as `writeback_workflow_type_ids`. Example: [24].
+
+**B2 — Which tags should we apply?**
+1. A **multi-select** of Rock person Tag ids (options from the Tags lookup endpoint). Saved as `writeback_tag_ids`. Example: [1] (Tag Id 1 = "Staff" on the test instance).
+
+B1 and B2 are independent and both optional. If neither is chosen, no write-back happens for cards captured into this CareFlow.
+
+> **Rock scope note:** SaltLight writes follow-up into Rock **Workflows** — it creates a Workflow instance of the chosen WorkflowType (verified live: `POST /api/Workflows` returns the new Id, then `POST /api/AttributeValues` fills the guest's fields, and `POST /api/TaggedItems` with `EntityTypeId 15` applies tags). It does **not** write to Rock **Connection Requests** or **Group** enrollment. If a church models its follow-up as Connections or Groups instead, that is out of scope for v1 (a possible v2 add, not a redesign) — the same assumption the PCO integration makes.
 
 **Saving**
 1. On Save, SaltLight writes the answers into `workflow_data['rockrms']` on this CareFlow row as a single-element array. No Rock write happens at save time — Step 6 only ever *reads* from Rock to populate dropdowns.
-2. The filter and the write-back are fully independent: a CareFlow can have a filter and no write-back, write-back and no filter, both, or neither.
+2. **Section A** (form + triggering selection) is **required** once Rock is enabled for this CareFlow — they are saved together as the inbound trigger. **Section B** (write-back) is **independent and optional** — a Rock-connected CareFlow may have outbound write-back or not, but it always has an inbound form and triggering selection.
 
 ### Acceptance criteria
 - [ ] Step 6 lists only forms that were already mapped in Feature 1b (read from `account_metadata['rockrms']['mapped_forms']`); it does not let the admin map fields here.
 - [ ] Selecting a mapped form and saving stores a single-element array under `workflow_data['rockrms']` whose element carries the form's WorkflowType id in `workflow_type_id`.
 - [ ] The trigger attribute dropdown is populated from the selected form's fields (the Attributes lookup); the trigger-values multi-select is populated from that attribute's real option values (not free text) when the field is a dropdown / defined-value / value-list type.
-- [ ] When a submission filter is set, saving stores `trigger_attribute_id`, a `trigger_match_mode` of `"equals"` or `"any_of"`, plus a `trigger_values` array of one or more strings; with no filter, those keys are absent or empty and every submission of the form qualifies.
+- [ ] Saving a Rock-connected CareFlow stores `trigger_attribute_id`, a `trigger_match_mode` of `"equals"` or `"any_of"`, and a `trigger_values` array of one or more selections — **all required** once a form is chosen.
+- [ ] A CareFlow that has a form selected but **no triggering selection cannot be saved** — the API rejects it with a clear "choose which selection on this form triggers this CareFlow" message — so a CareFlow never fires on every submission by accident.
 - [ ] When a trigger attribute is chosen, SaltLight auto-detects single- vs multi-select from the field's `FieldTypeId`, displays it pre-filled and editable (the "Checkbox or Dropdown?" choice), and saves the resolved value as `trigger_match_mode`; the admin can override the auto-detection before saving.
-- [ ] The write-back tag selector is a multi-select populated from the Tags lookup (Person tags only, `EntityTypeId eq 15`); saving stores an array of tag ids in `writeback_tag_ids`.
-- [ ] The write-back workflow-type selector is a multi-select populated from the WorkflowTypes lookup; saving stores an array of WorkflowType ids in `writeback_workflow_type_ids`.
-- [ ] Filter and write-back are independently optional — any combination saves cleanly, and a fully blank Step 6 leaves the CareFlow with no Rock connection.
+- [ ] Section B's workflow selector (B1) is a multi-select populated from the WorkflowTypes lookup; saving stores an array of WorkflowType ids in `writeback_workflow_type_ids`.
+- [ ] Section B's tag selector (B2) is a multi-select populated from the Tags lookup (Person tags only, `EntityTypeId eq 15`); saving stores an array of tag ids in `writeback_tag_ids`.
+- [ ] Section B (outbound write-back) is **always shown but optional**; leaving both B1 and B2 empty saves cleanly with no write-back. SaltLight writes follow-up into Rock **Workflows** (creating a Workflow instance of the chosen type) — not Connection Requests or Group enrollment.
+- [ ] Section A (write-back aside) is required once Rock is enabled: a fully blank Step 6 (no form chosen) leaves the CareFlow with no Rock connection; once a form is chosen, both the form and a triggering selection are required to save.
 - [ ] If a campus-type field is chosen as the trigger attribute, the multi-select displays campus names but persists each campus **Id as a string** (e.g. `"1"`); a campus field is single-select (`trigger_match_mode: "equals"`), so Feature 3's exact-string comparison matches what Rock stores.
-- [ ] Re-opening Step 6 after a save shows the previously selected form, filter values, tags, and workflow types exactly as stored.
+- [ ] Re-opening Step 6 after a save shows the previously selected form, triggering selection, write-back workflows, and tags exactly as stored.
 
 ### What the backend touches
-- **CareFlow wizard (Step 6) save path** writes the config; no new Lambda handler is required for the save itself if the wizard persists through the existing CareFlow/workflow update path. The Rock-specific work here is **read-only lookups** to populate the three dropdowns.
+- **CareFlow wizard (Step 6) save path** writes the config; no new Lambda handler is required for the save itself if the wizard persists through the existing CareFlow/workflow update path. The Rock-specific work here is **read-only lookups** to populate the Step 6 dropdowns.
 - **Lookup handlers in `orchestrator/src/rockrms.py`** serve the dropdown data the portal needs:
-  - the **forms** handler (`GET /integrations/rockrms/forms`) backs Question 1 and Question 2 — with no params it returns the WorkflowTypes list; with `form_id` it returns that form's fields; with `form_id` + `form_field_id` it returns that field's option values,
-  - the **tags** handler (`GET /integrations/rockrms/tags`, Person tags) backs Question 3.
+  - the **forms** handler (`GET /integrations/rockrms/forms`) backs Section A (A1 + A2) and Section B's B1 — with no params it returns the WorkflowTypes list (used by A1's form picker and B1's write-back workflow picker); with `form_id` it returns that form's fields (A2); with `form_id` + `form_field_id` it returns that field's option values (A2),
+  - the **tags** handler (`GET /integrations/rockrms/tags`, Person tags) backs Section B's B2.
   - Each lookup handler resolves the account, opens a `RockRMS` integration instance, and returns a bare list of `{id, name/label}` objects for the UI.
 - **Table + JSONB key written:** `public.workflow` → `workflow_data['rockrms']` (a JSONB **array**; v1 uses a single element). The mapped-forms source it reads against is `public.account` → `account_metadata['rockrms']['mapped_forms']` (owned by Feature 1b — Feature 2 only reads it). Campus-name display for a campus trigger attribute is resolved against the campus cache at `account_metadata['rockrms']['campuses']` (written at connect time, Feature 1).
 - **No Rock write** occurs in this feature. Applying tags and launching workflows in Rock is Feature 4 (write-back), which consumes the `writeback_tag_ids` / `writeback_workflow_type_ids` stored here. (Note for Feature 4: its `POST /api/TaggedItems` for a person tag must include `EntityTypeId: 15`, or Rock returns HTTP 500.)
@@ -357,12 +372,12 @@ Every API row below gives **two direct links**: the Swagger controller view and 
 
 | What | Endpoint (+ key query params) | Method | Direct links |
 |---|---|---|---|
-| List active Rock forms (Question 1 — "which form?") | `/api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Guid,Name&$orderby=Name asc` | GET | [Swagger › WorkflowTypes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "WorkflowTypes list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
-| List a form's fields (Question 2 — pick the trigger attribute) | `/api/Attributes?$filter=EntityTypeId eq 113 and EntityTypeQualifierColumn eq 'WorkflowTypeId' and EntityTypeQualifierValue eq '<workflow_type_id>'&$select=Id,Key,Name,FieldTypeId` (EntityTypeId 113 = the Workflow entity type — verified in the Test Env doc) | GET | [Swagger › Attributes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Form fields (Attributes)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
+| List active Rock forms (Section A · A1 — "which form?") | `/api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Guid,Name&$orderby=Name asc` | GET | [Swagger › WorkflowTypes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "WorkflowTypes list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
+| List a form's fields (Section A · A2 — pick the trigger field) | `/api/Attributes?$filter=EntityTypeId eq 113 and EntityTypeQualifierColumn eq 'WorkflowTypeId' and EntityTypeQualifierValue eq '<workflow_type_id>'&$select=Id,Key,Name,FieldTypeId` (EntityTypeId 113 = the Workflow entity type — verified in the Test Env doc) | GET | [Swagger › Attributes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Form fields (Attributes)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | List a trigger attribute's option values — DefinedValue picker | `/api/AttributeQualifiers?$filter=AttributeId eq <attr_id> and Key eq 'definedtypeguid'&$select=Value`, then `/api/DefinedTypes?$filter=Guid eq guid'<guid>'&$select=Id`, then `/api/DefinedValues?$filter=DefinedTypeId eq <id>&$select=Id,Value&$orderby=Order asc` | GET | [Swagger › AttributeQualifiers](https://saltlight.rockcloud.com/api/docs) · [Swagger › DefinedValues](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Field values (DefinedValue)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | List a trigger attribute's option values — Value List field | `/api/AttributeQualifiers?$filter=AttributeId eq <attr_id> and Key eq 'values'&$select=Value` (returns a pipe-delimited string of `Label,value` pairs) | GET | [Swagger › AttributeQualifiers](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Field values (Value List)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
-| List person Tags (Question 3 — write-back tags multi-select) | `/api/Tags?$filter=EntityTypeId eq 15&$select=Id,Guid,Name&$orderby=Name asc` (EntityTypeId 15 = Person) | GET | [Swagger › Tags](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Tags list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
-| List WorkflowTypes for write-back (Question 3 — workflow types multi-select) | `/api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Guid,Name&$orderby=Name asc` (same WorkflowTypes lookup as Question 1) | GET | [Swagger › WorkflowTypes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "WorkflowTypes list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
+| List person Tags (Section B · B2 — write-back tags multi-select) | `/api/Tags?$filter=EntityTypeId eq 15&$select=Id,Guid,Name&$orderby=Name asc` (EntityTypeId 15 = Person) | GET | [Swagger › Tags](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Tags list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
+| List WorkflowTypes for write-back (Section B · B1 — workflow types multi-select) | `/api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Guid,Name&$orderby=Name asc` (same WorkflowTypes lookup as A1) | GET | [Swagger › WorkflowTypes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "WorkflowTypes list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | Resolve campus Id → name (only if a campus field is the trigger attribute) | Read from the connect-time cache `account_metadata['rockrms']['campuses']` (source: `/api/Campuses?$filter=IsActive eq true&$select=Id,Guid,Name,ShortCode`) | GET | [Swagger › Campuses](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Campuses list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 
 General references: [Rock REST API overview](https://community.rockrms.com/developer/rock-api) · [Rock developer hub](https://community.rockrms.com/developer) · [Canonical spec hub](https://saltlight-richard.github.io/saltlight-specs/specs/rock-rms.html) · live instance [saltlight.rockcloud.com](https://saltlight.rockcloud.com) (Rock 18.1.0.0). Swagger is browsable per controller — open `https://saltlight.rockcloud.com/api/docs` and pick the named controller (WorkflowTypes, Attributes, AttributeQualifiers, DefinedValues, Tags, Campuses).
@@ -382,9 +397,9 @@ General references: [Rock REST API overview](https://community.rockrms.com/devel
 ]
 ```
 
-- `workflow_type_id` — the mapped form chosen in Question 1 (the WorkflowType id; 24 = "First Time Guest - SaltLight" on the test instance).
-- `trigger_attribute_id` / `trigger_match_mode` / `trigger_values` — Question 2; all absent or empty means "pick up every submission of this form." `trigger_match_mode` is `"equals"` (single-select field) or `"any_of"` (multi-select/checkbox field), auto-detected from the attribute's `FieldTypeId` and admin-confirmable; Feature 3 reads it to choose exact-match vs intersection-match. `trigger_values` is always an array of strings (store the Campus Id-string for a campus field, e.g. `"1"`). InterestArea (AttributeId 8286) is Feature 2's optional trigger field — it is NOT one of the five mapped core fields.
-- `writeback_tag_ids` / `writeback_workflow_type_ids` — Question 3; multi-select arrays; both optional. Empty/absent means no write-back. These are consumed by Feature 4. (Tag Id 1 = "Staff", WorkflowType 24 on the test instance.)
+- `workflow_type_id` — the mapped form chosen in Section A (A1) (the WorkflowType id; 24 = "First Time Guest - SaltLight" on the test instance).
+- `trigger_attribute_id` / `trigger_match_mode` / `trigger_values` — Section A (A2); **required for any Rock-connected CareFlow** — together they identify the selection that fires this CareFlow. `trigger_match_mode` is `"equals"` (single-select field) or `"any_of"` (multi-select/checkbox field), auto-detected from the attribute's `FieldTypeId` and admin-confirmable; Feature 3 reads it to choose exact-match vs intersection-match. `trigger_values` is always an array of one or more strings (store the Campus Id-string for a campus field, e.g. `"1"`). InterestArea (AttributeId 8286) is Feature 2's trigger field — it is NOT one of the five mapped core fields.
+- `writeback_workflow_type_ids` / `writeback_tag_ids` — Section B (B1 workflows, B2 tags); multi-select arrays; both optional. Empty/absent means no write-back. These are consumed by Feature 4. (WorkflowType 24, Tag Id 1 = "Staff" on the test instance.)
 
 > **Key-name note for Kenneth:** Feature 2 uses the **plural, array** keys `writeback_tag_ids` and `writeback_workflow_type_ids` because write-back is multi-select (confirmed in the corrected guidance). These supersede any singular `writeback_tag_id` / `writeback_workflow_type_id` shown in earlier draft schema sections. Feature 4 must read the plural array keys.
 
@@ -447,7 +462,7 @@ This feature is a single scheduled Lambda that polls Rock on a schedule and inge
 2. For each mapped WorkflowType, the poller fetches **completed** Workflow instances of that type whose `CreatedDateTime` is greater than the Track 2 cursor, ordered by `CreatedDateTime` ascending. `Status eq 'Completed'` goes **in the `$filter`** alongside `WorkflowTypeId` and `CreatedDateTime` — this is verified working on Rock 18.1.0.0 (confirmed 2026-06-02 returning workflows 8/9/10), so there is no in-memory status pass. (Each WorkflowType is polled once per cycle even if several CareFlows reference it.)
 3. Because Rock will not return a workflow's field values inline (`$expand=AttributeValues` is rejected with HTTP 400), the poller then makes a **batch fetch** of `/api/AttributeValues` for all relevant attribute ids, and **joins the values to their workflows in memory** by `EntityId` (= the workflow id).
 4. For each workflow, the poller **dedups by Rock workflow id** — if a Connect Card already exists for that `rock_workflow_id`, skip it.
-5. Using the Feature 1b field mapping (`account_metadata['rockrms']['mapped_forms']`), the poller reads first name, last name, email, phone and campus off the joined attribute values, plus the CareFlow's trigger field (Feature 2). A CampusPicker value arrives as the Campus **Id as a string** (e.g. `"1"`) and must be resolved to a name through the campus cache. If the CareFlow defines a submission filter (trigger field + allowed values), apply it using the CareFlow's **`trigger_match_mode`**: for `"equals"` (single-select fields) the submission's single trigger value must equal one of the allowed values; for `"any_of"` (multi-select/checkbox fields, where Rock stores several selections in one delimited attribute value) split the stored value and keep the submission if **any** selected value is in the allowed set. If nothing matches, skip the submission.
+5. Using the Feature 1b field mapping (`account_metadata['rockrms']['mapped_forms']`), the poller reads first name, last name, email, phone and campus off the joined attribute values, plus the CareFlow's trigger field (Feature 2). A CampusPicker value arrives as the Campus **Id as a string** (e.g. `"1"`) and must be resolved to a name through the campus cache. The poller then applies the CareFlow's **required trigger selection** using its **`trigger_match_mode`**: for `"equals"` (single-select fields) the submission's single selection must equal one of the CareFlow's `trigger_values`; for `"any_of"` (multi-select/checkbox fields, where Rock stores several selections in one delimited attribute value) split the stored value and keep the submission if **any** checked value is in the CareFlow's `trigger_values`. If nothing matches, skip the submission for this CareFlow (the guest did not make the selection that fires it).
 6. A surviving workflow becomes a Connect Card tagged `source: "rock_track2"`, matched to the CareFlow, and the CareFlow begins.
 7. After all mapped types are processed, the Track 2 cursor advances to the **maximum `CreatedDateTime`** seen this run (accumulated across all WorkflowTypes, written once at the end).
 
@@ -474,7 +489,7 @@ This feature is a single scheduled Lambda that polls Rock on a schedule and inge
 - **Lambda / handler:** the scheduled poll handler in `tf/lambda_functions/orchestrator/src/rockrms.py` (the always-5-min EventBridge target), which iterates connected accounts and, for each that passes the should-poll gate, runs the per-account Track 1 + Track 2 ingestion. Registered in the orchestrator's scheduled-event function registry in `main.py`; the every-5-minute rule lives in `tf/events.tf`.
 - **Rock client methods:** add poll/fetch helpers to `tf/lambda_functions/shared/integrations/rockrms.py` — fetch new/updated People (Track 1), fetch completed Workflows of a type (Track 2 call 1), batch-fetch AttributeValues (Track 2 call 2), plus the shared bare-array normaliser used on every list response.
 - **`public.account` → `account_metadata['rockrms']` JSONB:** reads `connected`, `campuses`, `mobile_id`, `poll_schedule`, `last_polled`; reads/writes `poll_cursor_track1` and `poll_cursor_track2`. (The `campuses` cache is populated at connect time by Feature 1 — Feature 3 only reads it.)
-- **`public.workflow` → `workflow_data['rockrms']` JSONB:** reads each CareFlow's Rock config — which mapped form (WorkflowTypeId) and the optional trigger field + allowed values (Feature 2).
+- **`public.workflow` → `workflow_data['rockrms']` JSONB:** reads each CareFlow's Rock config — which mapped form (WorkflowTypeId) and the trigger field + allowed values (Feature 2).
 - **`public.account_metadata['rockrms']['mapped_forms']` (Feature 1b):** the account-level form → field-id mapping used to read Track 2 submission values (first name, last name, email, phone, campus).
 - **`public.connect_card` → `connect_card_data` JSONB:** inserts new Connect Cards tagged by `source`; also the dedup lookups (`connect_card_data->>'rock_person_id'` for Track 1, `connect_card_data->>'rock_workflow_id'` for Track 2).
 - **`public.interaction`:** one pending interaction row per configured CareFlow so the CareFlow engine starts follow-up.
@@ -491,7 +506,7 @@ This feature is a single scheduled Lambda that polls Rock on a schedule and inge
 | OData conventions ($filter, $expand, $select, $orderby, $top) | n/a | n/a | [Rock REST API overview](https://community.rockrms.com/developer/rock-api) · [Rock developer hub](https://community.rockrms.com/developer) |
 | Canonical spec hub | n/a | n/a | [Rock RMS spec hub](https://saltlight-richard.github.io/saltlight-specs/specs/rock-rms.html) |
 
-Test data ready to pull (created 2026-06-02 on `saltlight.rockcloud.com`, Rock 18.1.0.0): Track 1 People **22 (PollerTest Alpha), 23 (Bravo), 24 (Charlie)**, each with a mobile phone; Track 2 Workflows **8 (Delta / Sunday Service), 9 (Echo / Youth Ministry), 10 (Foxtrot / Kids Ministry)**, all `Status=Completed` with all 6 attributes populated. Suggested cursor `2026-06-02T12:11:00` (Rock-local, no trailing `Z`) catches all six. WorkflowType 24 attribute ids: FirstName 8281, LastName 8282, Email 8283, Phone 8284, Campus 8285, InterestArea 8286 (InterestArea is Feature 2's optional trigger field, not one of the five mapped core fields). Campuses: 1 = Main, 2 = North. Ignore stale People 20–21 (Rock blocks DELETE on `/api/People`).
+Test data ready to pull (created 2026-06-02 on `saltlight.rockcloud.com`, Rock 18.1.0.0): Track 1 People **22 (PollerTest Alpha), 23 (Bravo), 24 (Charlie)**, each with a mobile phone; Track 2 Workflows **8 (Delta / Sunday Service), 9 (Echo / Youth Ministry), 10 (Foxtrot / Kids Ministry)**, all `Status=Completed` with all 6 attributes populated. Suggested cursor `2026-06-02T12:11:00` (Rock-local, no trailing `Z`) catches all six. WorkflowType 24 attribute ids: FirstName 8281, LastName 8282, Email 8283, Phone 8284, Campus 8285, InterestArea 8286 (InterestArea is Feature 2's trigger field, not one of the five mapped core fields). Campuses: 1 = Main, 2 = North. Ignore stale People 20–21 (Rock blocks DELETE on `/api/People`).
 
 **Track 1 — People response shape** (note: a **bare array**, and `PhoneNumbers` arrives inline only because there is no `$select`; timestamps are Rock-LOCAL time, no trailing `Z`):
 
@@ -602,12 +617,12 @@ As a church admin, I want guests captured by SaltLight (scanned or manually ente
 
 ### User journey
 
-A Connect Card is created in SaltLight from a non-Rock source (CardCapture scan, manual entry, or web form). The CareFlow it matched has Rock write-back configured in its Feature 2 settings. SaltLight attempts to push the guest to Rock immediately, but the CareFlow starts regardless — the push never blocks follow-up.
+A Connect Card is created in SaltLight from a non-Rock source (CardCapture scan, manual entry, or web form). The CareFlow it matched has Rock write-back configured in its Feature 2 **Section B (outbound)** settings. SaltLight attempts to push the guest to Rock immediately, but the CareFlow starts regardless — the push never blocks follow-up.
 
 **Track A — Rock is available (the happy path)**
 
 1. SaltLight checks the card's `source`. If it is `rock_track1` or `rock_track2` (the two v1 ingestion sources), it stops here — that card came FROM Rock and must never be pushed back (that would create a loop). The guard also recognizes `rock_webhook`, a reserved-for-future source with no v1 producer (see Gotchas) — so the guard is forward-compatible the day a webhook ingestion path ships, but no `rock_webhook` card exists in v1.
-2. SaltLight reads the CareFlow's write-back config (`writeback_tag_ids`, `writeback_workflow_type_ids`). If both are empty and there is no Rock connection, there is nothing to do and it stops.
+2. SaltLight reads the CareFlow's write-back config (`writeback_tag_ids`, `writeback_workflow_type_ids`). If both are empty, there is no write-back configured — nothing to do, and it stops.
 3. SaltLight marks the card `rock_sync_status = 'pending'` before doing anything else, so any failure leaves it queued.
 4. **Find the person.** SaltLight searches Rock by **email first**. If no email match (or no email on the card), it searches by **phone, digits-only**. The first match wins.
 5. **Found → update.** SaltLight updates the existing Rock person with any new non-blank fields from the card. It never overwrites an existing Rock value with a blank. (v1 updates first name / last name / email only — see Gotchas for why phone is excluded.)
@@ -789,7 +804,7 @@ Every row carries **two real hyperlinks** — the Swagger controller and the nam
 
 - **URL:** https://saltlight.rockcloud.com — Rock **18.1.0.0**.
 - **Auth:** REST key passed as `Authorization-Token` header (the live key is in the Test Environment doc, not here). Service account is a RestUser in `RSR - Rock Administration` — if you ever get a 401, it is almost always a missing security role, not a bad key.
-- **WorkflowType 24** = "First Time Guest - SaltLight". AttributeIds: **FirstName 8281, LastName 8282, Email 8283, Phone 8284, Campus 8285, InterestArea 8286**. InterestArea is Feature 2's optional trigger field, **not** one of the five mapped core fields. InterestArea options: Sunday Service, Youth Ministry, Kids Ministry, Small Groups.
+- **WorkflowType 24** = "First Time Guest - SaltLight". AttributeIds: **FirstName 8281, LastName 8282, Email 8283, Phone 8284, Campus 8285, InterestArea 8286**. InterestArea is Feature 2's trigger field, **not** one of the five mapped core fields. InterestArea options: Sunday Service, Youth Ministry, Kids Ministry, Small Groups.
 - **Campuses:** 1 = Main, 2 = North.
 - **Tag:** Id 1 = "Staff" (a Person tag, EntityTypeId 15).
 
