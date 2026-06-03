@@ -93,7 +93,7 @@ As a church admin, I want to connect my Rock RMS account to SaltLight by enterin
 This feature is a single path — there is no Track 1 / Track 2 split at connect time. It runs as an ordered sequence, and every step must succeed before the connection is marked live. Nothing else in the integration (Features 2, 3, 4) works until this completes.
 
 1. The admin opens **Integrations → Rock RMS** in the SaltLight portal and enters two things: their **Rock domain** (e.g. `gracechurch.rockrms.com`) and their **Rock REST API key**.
-2. SaltLight runs a **connectivity probe** — it confirms Rock is reachable at that domain. If the domain is wrong or Rock is not publicly accessible, the admin sees a "not reachable" message and the connection is not saved.
+2. SaltLight runs a **connectivity probe** — it confirms Rock is reachable at that domain. This is a bare HTTP reachability check (no dedicated endpoint row below); in practice the permissions probe in the next step doubles as the reachability test. If the domain is wrong or Rock is not publicly accessible, the admin sees a "not reachable" message and the connection is not saved.
 3. SaltLight runs a **permissions probe** — it calls `GET /api/People/GetCurrentPerson` as the key's user to confirm the key not only authenticates but has People read access. A key that authenticates but lacks a Rock security role fails here (HTTP 401) with a specific, actionable message (the message points the admin at Rock's security settings, not at SaltLight).
 4. SaltLight **resolves three install-specific DefinedValue IDs** from their portable GUIDs (the GUIDs are identical on every Rock install; the integer IDs differ per install). It resolves: **Active RecordStatus**, **Visitor ConnectionStatus**, and **Mobile PhoneType**. Each is a separate `GET /api/DefinedValues` lookup that filters by the portable GUID and reads back the install's integer `Id`.
 5. SaltLight **caches the active campus list** — it fetches all active campuses (`GET /api/Campuses?$filter=IsActive eq true`) and stores each campus's `Id` and `Name`. This cache is what every later feature uses to translate a campus reference into a name (and, for CampusPicker attribute values, to translate a stored string Campus Id back into a campus).
@@ -109,7 +109,7 @@ This feature is a single path — there is no Track 1 / Track 2 split at connect
 ### Acceptance criteria
 - [ ] Connection succeeds **only if** Rock is reachable at the domain **AND** the key's user has People read access; if either fails, no connection state is written and no credentials are stored.
 - [ ] An unreachable domain returns a distinct "Rock is not reachable at that URL — verify the domain and that Rock is publicly accessible" message; a valid-key-but-no-permission case (HTTP 401 on `GET /api/People/GetCurrentPerson`) returns a distinct message that points the admin to Rock's security settings.
-- [ ] On success, the account's connection state contains: `connected: true`, `domain`, `org_id` equal to the domain, `active_status_id`, `visitor_id`, `mobile_id`, and a `campuses` array of `{id, name}` for every active campus.
+- [ ] On success, the account's connection state contains (among others): `connected: true`, `church_name`, `domain`, `connected_at`, `org_id` equal to the domain, `active_status_id`, `visitor_id`, `mobile_id`, a `campuses` array of `{id, name}` for every active campus, the two poll cursors + `last_polled`, and the `poll_schedule` block.
 - [ ] The three resolved IDs are the **install-specific integers** obtained by resolving the portable GUIDs at connect time via `GET /api/DefinedValues?$filter=Guid eq guid'<GUID>'` — never hardcoded values.
 - [ ] The REST API key is stored in AWS Secrets Manager (per-env, per-account path) and is **not** written to the database in any form.
 - [ ] `poll_cursor_track1`, `poll_cursor_track2`, and `last_polled` are all initialized to `connected_at` at connect time, and `connected_at` is aligned to Rock's local server clock (not UTC) — stored as a plain `YYYY-MM-DDThh:mm:ss` string with **no trailing `Z` and no offset**. On the test install (`saltlight.rockcloud.com`) the offset is ~7 hours behind UTC; verify the live install's offset.
@@ -248,7 +248,7 @@ The Swagger explorer at `https://saltlight.rockcloud.com/api/docs` is a single l
 |---|---|---|---|
 | List the church's active forms (form picker) | `/api/WorkflowTypes?$filter=IsActive eq true&$select=Id,Guid,Name&$orderby=Name asc` | GET | [Swagger › WorkflowTypes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "WorkflowTypes list"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | List a form's fields (for mapping + suggestion) | `/api/Attributes?$filter=EntityTypeId eq 113 and EntityTypeQualifierColumn eq 'WorkflowTypeId' and EntityTypeQualifierValue eq '<workflow_type_id>'&$select=Id,Key,Name,FieldTypeId` | GET | [Swagger › Attributes](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Form fields (Attributes)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
-| List option values for a dropdown field (DefinedValue picker path) | `/api/AttributeQualifiers?$filter=AttributeId eq <attr_id> and Key eq 'definedtypeguid'&$select=Value` then `/api/DefinedTypes?$filter=Guid eq guid'<guid>'&$select=Id` then `/api/DefinedValues?$filter=DefinedTypeId eq <id>&$select=Id,Value&$orderby=Order asc` | GET | [Swagger › AttributeQualifiers](https://saltlight.rockcloud.com/api/docs) · [Swagger › DefinedValues](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Field values (Value List)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
+| List option values for a dropdown field (DefinedValue picker path) | `/api/AttributeQualifiers?$filter=AttributeId eq <attr_id> and Key eq 'definedtypeguid'&$select=Value` then `/api/DefinedTypes?$filter=Guid eq guid'<guid>'&$select=Id` then `/api/DefinedValues?$filter=DefinedTypeId eq <id>&$select=Id,Value&$orderby=Order asc` | GET | [Swagger › AttributeQualifiers](https://saltlight.rockcloud.com/api/docs) · [Swagger › DefinedValues](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Field values (DefinedValue)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | List option values for a "Value List" field (pipe-delimited path) | `/api/AttributeQualifiers?$filter=AttributeId eq <attr_id> and Key eq 'values'&$select=Value` (parse `Label,value` pairs split on `\|`) | GET | [Swagger › AttributeQualifiers](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Field values (Value List)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | API explorer (live Swagger on the test install) | `https://saltlight.rockcloud.com/api/docs` | — | [Rock REST API explorer](https://saltlight.rockcloud.com/api/docs) |
 | Rock REST/OData conventions | $filter, $select, $orderby on `/api/{Entity}` | — | [Rock REST API overview](https://community.rockrms.com/developer/rock-api) · [Rock developer hub](https://community.rockrms.com/developer) |
@@ -517,7 +517,7 @@ Test data ready to pull (created 2026-06-02 on `saltlight.rockcloud.com`, Rock 1
     "FirstName": "PollerTest",
     "LastName": "Alpha",
     "Email": "alpha@example.com",
-    "ModifiedDateTime": "2026-06-02T12:11:00",
+    "ModifiedDateTime": "2026-06-02T12:11:56",
     "PrimaryCampusId": 1,
     "PhoneNumbers": [
       { "Number": "(555) 201-1001", "NumberTypeValueId": 12 }
@@ -548,7 +548,7 @@ Test data ready to pull (created 2026-06-02 on `saltlight.rockcloud.com`, Rock 1
     "email": "alpha@example.com",
     "phone": "(555) 201-1001",
     "campus_id": 1,
-    "campus_name": "Main"
+    "campus_name": "Main Campus"
   }
 }
 ```
@@ -563,7 +563,7 @@ Test data ready to pull (created 2026-06-02 on `saltlight.rockcloud.com`, Rock 1
     "last_name": "Guest",
     "email": "delta@example.com",
     "phone": "(555) 201-1001",
-    "campus_name": "Main"
+    "campus_name": "Main Campus"
   }
 }
 ```
@@ -605,9 +605,9 @@ Test data ready to pull (created 2026-06-02 on `saltlight.rockcloud.com`, Rock 1
 - **Dedup must run before insert, per track** — Track 1 by `rock_person_id`, Track 2 by `rock_workflow_id`. A guest who submits the same Rock form twice, or a poll that overlaps a cursor boundary, must still produce only one Connect Card.
 - **Source tagging is the loop guard.** Every card created here is tagged `rock_track1` / `rock_track2`; Feature 4 keys off that source to skip pushing these cards back to Rock. Do not omit or rename the source. (`rock_webhook` is reserved for a possible future v2 webhook path and is never produced in v1 — the guards are forward-compatible only.)
 - **One failing account must not abort the run.** Wrap each account's poll so an unreachable Rock or a bad cursor logs and continues; never advance a cursor for an account whose poll did not complete.
-## Feature 4 — Card Capture Push: SaltLight → Rock
+## Feature 4 — Card Capture Push: SaltLight → Rock (write-back only)
 
-> 🧭 Rock RMS Integration › Feature 4 — Card Capture Push: SaltLight → Rock
+> 🧭 Rock RMS Integration › Feature 4 — Card Capture Push: SaltLight → Rock (write-back only)
 
 **Scope:** write-back ONLY. This feature owns every write into Rock (search, create/update person, apply tags, create workflows). It does not poll Rock or create Connect Cards from Rock — that is Feature 3 (ingestion only). Feature 4 fires when a Connect Card is captured in SaltLight from a non-Rock source.
 
@@ -629,7 +629,7 @@ A Connect Card is created in SaltLight from a non-Rock source (CardCapture scan,
 6. **Not found → create.** SaltLight creates a new Rock Person using the card fields, stamped as a Visitor (ConnectionStatus from the connect-time cache) with an Active record status. `POST /api/People` returns the new person's Id as a **bare integer** — read it as the return value directly (see Gotchas).
 7. SaltLight stores the resulting Rock person Id on the SaltLight person record (`person_metadata['rockrms_person_id']`) so future pushes reuse the same person.
 8. **Apply tags.** For each id in `writeback_tag_ids`, SaltLight resolves the person's Guid (via a person GET), then applies that Tag to the person in Rock.
-9. **Create workflows.** For each id in `writeback_workflow_type_ids`, SaltLight creates one Workflow instance in Rock for that person (associated via the person's `PrimaryAliasId`, not the raw person Id) and fills its attributes (name, email, phone, campus, interest) from the card.
+9. **Create workflows.** For each id in `writeback_workflow_type_ids`, SaltLight creates one Workflow instance in Rock for that person (associated via the person's `PrimaryAliasId`, not the raw person Id) and fills its core fields (first name, last name, email, phone, campus) from the card, using that WorkflowType's AttributeIds from the account-level `mapped_forms` mapping (the same source Feature 3 reads). The workflow type itself encodes the follow-up category, so no separate "interest" field is filled.
 10. SaltLight marks the card `rock_sync_status = 'synced'`. The guest is now in SaltLight's CareFlow AND attributed in Rock.
 
 **Track B — Rock is unavailable (queue + retry)**
@@ -642,7 +642,7 @@ A Connect Card is created in SaltLight from a non-Rock source (CardCapture scan,
 
 **Examples (verifiable against the loaded test data):**
 
-- Maria scanned at the welcome tent visited 6 months ago and is already in Rock by email. Her record is updated with today's contact info (no blanks written), the configured tags are applied, and a "First Time Guest - SaltLight" workflow (Type 24) is created with her name, email, phone, campus, and her circled interest filled into attributes 8281–8286.
+- Maria scanned at the welcome tent visited 6 months ago and is already in Rock by email. Her record is updated with today's contact info (no blanks written), the configured tags are applied, and a "First Time Guest - SaltLight" workflow (Type 24) is created with her name, email, phone, and campus filled into attributes 8281–8285 (the interest is encoded by the workflow type itself, so attribute 8286 is not filled).
 - David is brand new. No email or phone match, so SaltLight creates him in Rock as a Visitor (the create returns his new Id as a bare integer), then applies tags and creates the workflows.
 - Rock is down when Emily's card is scanned. Her Connect Card and CareFlow start immediately; her push stays `'pending'` and is retried on the next poll. If it can't land in 10 tries, the team is alerted.
 
@@ -652,7 +652,7 @@ A Connect Card is created in SaltLight from a non-Rock source (CardCapture scan,
 - [ ] Search order is enforced: email first; phone (digits-only) only if email did not match or was absent.
 - [ ] When the person already exists in Rock (matched by email or phone), no duplicate Person is created.
 - [ ] On update, no existing Rock field is overwritten with a blank — only non-empty card fields are written.
-- [ ] For each id in `writeback_tag_ids`, the corresponding Tag is applied to the person; for each id in `writeback_workflow_type_ids`, one Workflow instance is created and its name/email/phone/campus/interest attributes are populated from the card.
+- [ ] For each id in `writeback_tag_ids`, the corresponding Tag is applied to the person; for each id in `writeback_workflow_type_ids`, one Workflow instance is created and its first-name/last-name/email/phone/campus attributes are populated from the card, using that WorkflowType's AttributeIds read from `mapped_forms`.
 - [ ] On create, the new person's Id is read from the bare-integer return of `POST /api/People` and saved to `person_metadata['rockrms_person_id']` so subsequent pushes for that guest reuse the same Rock person.
 - [ ] When Rock is unavailable, the card is marked `'pending'`, the CareFlow still starts, and the card is retried on later poll cycles until it succeeds.
 - [ ] After 10 consecutive failed attempts for the same card, status becomes `'failed'` and SaltLight's internal team is alerted.
@@ -666,8 +666,8 @@ A Connect Card is created in SaltLight from a non-Rock source (CardCapture scan,
 - **Source guard:** applied at the start of both the immediate trigger and the sweep — `source ∈ {rock_track1, rock_track2, rock_webhook}` short-circuits with no Rock write. Only `rock_track1` and `rock_track2` exist in v1; `rock_webhook` is listed so the guard is forward-compatible, but no v1 path produces it.
 - **Tables / JSONB keys:**
   - `public.connect_card` — read `connect_card_data` (source + card fields); write the three sync-tracking columns `rock_sync_status`, `rock_sync_attempts`, `rock_sync_last_attempted` (new columns; require a migration before deploy).
-  - `public.workflow.workflow_data['rockrms']` — read the CareFlow's write-back config: `writeback_tag_ids` (array) and `writeback_workflow_type_ids` (array), plus the attribute-id mapping used to fill workflow fields.
-  - `public.account.account_metadata['rockrms']` — read `connected`, `campuses` (campus cache, for resolving a CampusPicker value to a Campus Id), and `visitor_id` (ConnectionStatus for new people).
+  - `public.workflow.workflow_data['rockrms']` — read the CareFlow's write-back config: `writeback_tag_ids` (array) and `writeback_workflow_type_ids` (array). It does **not** store a field mapping (that would violate the two-layer architecture — see Feature 1b).
+  - `public.account.account_metadata['rockrms']` — read `connected`, `campuses` (campus cache, for resolving a CampusPicker value to a Campus Id), `visitor_id` (ConnectionStatus for new people), and **`mapped_forms`** — the account-level field mapping used to fill a write-back workflow's fields, matched by `workflow_type_id` (the same source Feature 3 reads; never a per-CareFlow copy).
   - `public.person.person_metadata['rockrms_person_id']` — write the matched/created Rock person Id.
 - **Endpoints touched in Rock:** People (search/get/create/update), TaggedItems (apply tag), Workflows (create instance), AttributeValues (fill workflow attributes). All listed below.
 
@@ -688,22 +688,16 @@ A Connect Card is created in SaltLight from a non-Rock source (CardCapture scan,
 
 General references: [Rock REST API overview](https://community.rockrms.com/developer/rock-api) · [Rock developer hub](https://community.rockrms.com/developer) · [Rock O/Swagger explorer (live on the install)](https://saltlight.rockcloud.com/api/docs) · [Rock RMS Test Environment doc (credentials, verified curls, IDs, GUIDs)](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) · [Canonical spec hub](https://saltlight-richard.github.io/saltlight-specs/specs/rock-rms.html)
 
-**CareFlow write-back config shape** (read from `workflow_data['rockrms']`; both arrays optional — empty means skip that kind of write-back):
+**CareFlow write-back config shape** (read from `workflow_data['rockrms']`; both arrays optional — empty means skip that kind of write-back). Note there is **no** `attribute_ids` here — the field mapping used to fill a write-back workflow's fields is read from the account-level `account_metadata['rockrms']['mapped_forms']` (matched by `workflow_type_id`), the same source Feature 3 uses:
 
 ```json
 {
   "writeback_tag_ids": [1, 42],
-  "writeback_workflow_type_ids": [24],
-  "attribute_ids": {
-    "first_name": 8281,
-    "last_name": 8282,
-    "email": 8283,
-    "phone": 8284,
-    "campus": 8285,
-    "interest_area": 8286
-  }
+  "writeback_workflow_type_ids": [24]
 }
 ```
+
+> **Field mapping for write-back:** to fill a new workflow's fields, Feature 4 looks up that WorkflowType's `attribute_ids` (first_name, last_name, email, phone, campus) in `mapped_forms`. This means a write-back WorkflowType should also be one of the mapped forms (Feature 1b). If a church configures write-back to a WorkflowType that was never mapped, SaltLight can still create the instance and apply tags, but has no field mapping to fill — **Kenneth-verify** whether to require write-back types to be mapped, or to fetch their attributes live at write time.
 
 **Connect-card sync-tracking columns** (data, not logic):
 
@@ -715,7 +709,7 @@ General references: [Rock REST API overview](https://community.rockrms.com/devel
 }
 ```
 
-`null` status = write-back not applicable (no Rock connection, or the card came from Rock). `'failed'` = crossed the 10-attempt threshold; team alerted. The `rock_sync_last_attempted` value, like every timestamp Rock hands back, is Rock-local server time, not UTC — store it as a plain `YYYY-MM-DDThh:mm:ss` string with no trailing `Z` and no offset (see Gotchas).
+`null` status = write-back not applicable (no Rock connection, or the card came from Rock). `'failed'` = crossed the 10-attempt threshold; team alerted. The `rock_sync_last_attempted` value is written by SaltLight at push time (not returned by Rock); store it as a plain `YYYY-MM-DDThh:mm:ss` string with no trailing `Z` and no offset, consistent with how the poll cursors are stored (see Gotchas).
 
 **Apply-tag request shape** (note required `EntityTypeId`; `EntityGuid` is the person's Guid, not their Id):
 
@@ -792,12 +786,11 @@ Every row carries **two real hyperlinks** — the Swagger controller and the nam
 | 4 | Search existing person by phone | `/api/People?$filter=PhoneNumbers/any(p: p/Number eq '<digits>')&$top=5&$select=Id,FirstName,LastName,PrimaryAliasId` | GET | [Swagger › People](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: search by phone (verify OData any)"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | 4 | Create new Rock person (returns bare integer Id) | `/api/People` (body: ConnectionStatusValueId, RecordTypeValueId, RecordStatusValueId, names, email) | POST | [Swagger › People](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: create person"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | 4 | Update existing Rock person (returns HTTP 204) | `/api/People/{id}` (only non-blank fields; never overwrite with blanks) | PATCH | [Swagger › People](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: update person"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
-| 4 | Read PrimaryAliasId for workflow association | `/api/People/{id}?$select=Id,Guid,PrimaryAliasId` (note: `$select` ignored on single-record GET — read defensively) | GET | [Swagger › People](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: get alias"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
+| 4 | Read person Guid + PrimaryAliasId (one GET serves both workflow association and tagging) | `/api/People/{id}?$select=Id,Guid,PrimaryAliasId` (note: `$select` ignored on single-record GET — returns the full object, read defensively) | GET | [Swagger › People](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: get alias"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | 4 | Create a workflow instance in Rock (returns bare integer Id) | `/api/Workflows` (body: WorkflowTypeId, Name, InitiatorPersonAliasId, Status) | POST | [Swagger › Workflows](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: create workflow"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | 4 | Check for an existing AttributeValue row on the new workflow | `/api/AttributeValues?$filter=EntityId eq <wfId> and AttributeId eq <attrId>&$select=Id` | GET | [Swagger › AttributeValues](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: AV check"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | 4 | Create an AttributeValue (returns bare integer Id) | `/api/AttributeValues` (body: EntityId, AttributeId, Value) | POST | [Swagger › AttributeValues](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: AV create"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | 4 | Update an AttributeValue (returns HTTP 204) | `/api/AttributeValues/{id}` (body: Value) | PATCH | [Swagger › AttributeValues](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: AV update"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
-| 4 | Read a person's Guid before tagging | `/api/People/{id}?$select=Id,Guid` (TaggedItems needs the Guid, not the Id) | GET | [Swagger › People](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: get guid"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 | 4 | Apply a tag to a person (EntityTypeId 15 REQUIRED) | `/api/TaggedItems` (body: TagId, EntityGuid, **EntityTypeId: 15**) | POST | [Swagger › TaggedItems](https://saltlight.rockcloud.com/api/docs) · [Test Env › "Write-back: apply tag"](https://docs.google.com/document/d/1nn6t0ELgdHmDGC7P7d3rf-nGXGkHsFyCUEkKVugaUTs/edit) |
 
 ### Test environment access
