@@ -5,7 +5,7 @@ Audience: Kenneth (backend engineer). This spec covers **internal SaltLight rout
 
 ### How to read this document
 
-This spec is deliberately code-free. It tells you **what** the routing must do and **where** the data lives — never **how** to write it. You own all the code. The **data model comes first** (§1), before any rule, because every routing rule in this document depends on two new columns on the `workflow` table (`priority_rank` and `always_fire`). Read §1, then the rules will make sense.
+This spec is deliberately code-free. It tells you **what** the routing must do and **where** the data lives — never **how** to write it. You own all the code. The **data model comes first** (the Data Model and API Changes section), before any rule, because every routing rule in this document depends on two new columns on the `workflow` table (`priority_rank` and `always_fire`). Read the Data Model and API Changes section, then the rules will make sense.
 
 Every rule follows the same shape so you can skim:
 
@@ -26,11 +26,11 @@ Every major section opens with a breadcrumb so you always know where you are:
 
 - **🧭** = you are here (top-of-section locator).
 - A checkbox `- [ ]` in Acceptance criteria = a thing a tester (Richard or you) must be able to observe — in the database, a log, or a leader's message thread.
-- **Rule N** sections (§3–§6) each describe one routing behavior and reuse the shape above.
-- **EC-1 .. EC-7** (§8) are the edge cases — Kenneth-requested; all seven are kept.
+- **Rule N** sections (Rules 1-4) each describe one routing behavior and reuse the shape above.
+- **EC-1 .. EC-7** (Edge Cases) are the edge cases — Kenneth-requested; all seven are kept.
 - Code fences are **data only** (a column table or a stored config blob) or a single navigational decision diagram; they never contain code/logic to copy. If you see a fence, it is data or a navigation aid.
 
-## §1 Data Model and API Changes
+## Data Model and API Changes
 
 > 🧭 Multi-Selection Routing › Data Model and API Changes
 
@@ -87,11 +87,11 @@ How the two new columns appear on a single stored `workflow` row (Accepted Chris
 
 The `interaction` table is **unchanged**. No columns are added or altered there. The only schema change in this entire feature is the two columns above — `priority_rank` and `always_fire` — added solely to the `workflow` table.
 
-## §2 Overview
+## Overview
 
 > 🧭 Multi-Selection Routing › Overview / Mental Model
 
-When a guest submits a connect card, SaltLight decides which leader(s) receive a follow-up assignment based on how many selections the guest made and which active CareFlows those selections match. This section is the mental model for that decision; the rules in §3–§6 (plus the No-Match/Catch-All fall-through in §7) are the precise implementation of it, and they all depend on the two `workflow` columns defined in §1 (`priority_rank`, `always_fire`).
+When a guest submits a connect card, SaltLight decides which leader(s) receive a follow-up assignment based on how many selections the guest made and which active CareFlows those selections match. This section is the mental model for that decision; Rules 1-4 (plus the No-Match and Catch-All fall-through) are the precise implementation of it, and they all depend on the two `workflow` columns defined in the Data Model and API Changes section (`priority_rank`, `always_fire`).
 
 ### The routing principle
 
@@ -146,9 +146,9 @@ For a deduplicated leader (see Rule 4), this is one Message 1 covering the full 
                       two-message sequence fires        SaltLight's proposed action
 ```
 
-Read top to bottom: **single → direct** (terminates); **multi → priority winner (+ always-fire) → leader dedup → catch-all → admin**. The "nothing matched?" node and the catch-all / admin-notification fall-through below it sit only on the multi-selection path: it fires when no active CareFlow matches on that path. A single selection that already matched a CareFlow fires directly per Rule 1 and is never re-tested for no-match — its branch terminates before the convergence. (The single-selection path can also reach no-match in its own right when a lone selection matches nothing; that follows the same fall-through described in §7.)
+Read top to bottom: **single → direct** (terminates); **multi → priority winner (+ always-fire) → leader dedup → catch-all → admin**. The "nothing matched?" node and the catch-all / admin-notification fall-through below it sit only on the multi-selection path: it fires when no active CareFlow matches on that path. A single selection that already matched a CareFlow fires directly per Rule 1 and is never re-tested for no-match — its branch terminates before the convergence. (The single-selection path can also reach no-match in its own right when a lone selection matches nothing; that follows the same fall-through described in No-Match and Catch-All.)
 
-## §3 Rule 1 — Single Selection
+## Rule 1 — Single Selection
 
 > 🧭 Multi-Selection Routing › Rule 1 — Single Selection
 
@@ -193,7 +193,7 @@ As a church leader, when a guest submits a connect card with one selection that 
 - **Writes** one row to the `interaction` table (status: `initial`) for the matched CareFlow. The `interaction` schema is unchanged.
 - **Resolves** the assigned leader via `workflow_to_person_primary`, who then receives the two-message sequence.
 
-## §4 Rule 2 — Multi-Selection and Priority Ranking
+## Rule 2 — Multi-Selection and Priority Ranking
 
 > 🧭 Multi-Selection Routing › Rule 2 — Multi-Selection and Priority Ranking
 
@@ -203,7 +203,7 @@ If a guest makes more than one selection, priority ranking always applies. Among
 
 If none of the guest's selections match any configured CareFlow and no always-fire CareFlow applies, the catch-all CareFlow fires and logs the guest. This is the safety net for unique or unexpected connect cards — selections that fall outside whatever the church has currently configured. No card ever comes in without somewhere to go. If no catch-all is configured and nothing matches, the admin is notified with a proposed action.
 
-Priority ranking depends on the `priority_rank` rules established in §1 (Data Model & API Changes):
+Priority ranking depends on the `priority_rank` rules established in the Data Model and API Changes section:
 
 - Every active CareFlow must have a unique priority rank before it can go active. A CareFlow without a rank cannot be activated.
 - Ranks are positive integers (1, 2, 3 … N). Rank 1 is the highest priority; the lowest number wins.
@@ -249,7 +249,7 @@ As a church leader whose CareFlow is the highest-priority match for a guest who 
 - Writes one `interaction` record (status `initial`) for the priority winner; the `interaction` table schema is unchanged.
 - `POST /workflow` and `PUT /workflow` validate that `priority_rank` is non-null when `workflow_active = true` (400); `PUT /workflow` additionally rejects a changed rank already in use by another active CareFlow (409). The partial unique index backs the 409 at the database level. `GET /workflow/list` returns `priority_rank` and `always_fire` on every record.
 
-## §5 Rule 3 — Always-Fire Flag
+## Rule 3 — Always-Fire Flag
 
 > 🧭 Multi-Selection Routing › Rule 3 — Always-Fire Flag
 
@@ -285,9 +285,9 @@ As a church leader whose CareFlow has the always-fire flag enabled, I want to be
 
 ### What the backend touches
 
-Reads the `always_fire` and `priority_rank` columns on `workflow` for every CareFlow whose selection matched the card. After Rule 2 resolves the priority winner, any matched CareFlow with `always_fire = true` is added to the fire set alongside the winner. Writes one `interaction` record (status `initial`) per always-fire CareFlow that fires, and resolves each firing CareFlow's primary leader via `workflow_to_person_primary` to send the two-message sequence (Message 1 = full guest context, including every selection the guest made; Message 2 = AI-synthesized suggested reply drawn from the full guest context, with options SEND / NO / @). No new endpoints; this rule consumes the columns added in §1. The `interaction` table schema is unchanged.
+Reads the `always_fire` and `priority_rank` columns on `workflow` for every CareFlow whose selection matched the card. After Rule 2 resolves the priority winner, any matched CareFlow with `always_fire = true` is added to the fire set alongside the winner. Writes one `interaction` record (status `initial`) per always-fire CareFlow that fires, and resolves each firing CareFlow's primary leader via `workflow_to_person_primary` to send the two-message sequence (Message 1 = full guest context, including every selection the guest made; Message 2 = AI-synthesized suggested reply drawn from the full guest context, with options SEND / NO / @). No new endpoints; this rule consumes the columns added in the Data Model and API Changes section. The `interaction` table schema is unchanged.
 
-## §6 Rule 4 — Leader Deduplication
+## Rule 4 — Leader Deduplication
 
 > 🧭 Multi-Selection Routing › Rule 4 — Leader Deduplication
 
@@ -330,7 +330,7 @@ As a guest who checks multiple boxes on a connect card, I want to receive follow
 
 Reads the `workflow_to_person_primary` leader assignment for each matched CareFlow to group by primary leader, and reads `priority_rank` to identify the winner whose CareFlow serves as the primary voice reference for the combined Message 2. Writes one `interaction` record (status `initial`) per matched CareFlow — deduplication suppresses duplicate message sequences only, never the `interaction` records.
 
-## §7 No-Match and Catch-All
+## No-Match and Catch-All
 
 > 🧭 Multi-Selection Routing › No-Match and Catch-All
 
@@ -362,9 +362,9 @@ As an admin, I want unmatched guests to be routed to a catch-all CareFlow (or su
 
 ### What the backend touches
 
-This path reads the account's active CareFlows in the `workflow` table to determine that nothing matches. On the catch-all branch it enrolls the guest in the configured catch-all CareFlow and creates one `interaction` record (status: `initial`) for the catch-all's primary leader (`workflow_to_person_primary`). On the no-catch-all branch it creates no automatic enrollment and instead routes an admin notification. No new columns are read or written beyond those defined in §1; the `interaction` table schema is unchanged.
+This path reads the account's active CareFlows in the `workflow` table to determine that nothing matches. On the catch-all branch it enrolls the guest in the configured catch-all CareFlow and creates one `interaction` record (status: `initial`) for the catch-all's primary leader (`workflow_to_person_primary`). On the no-catch-all branch it creates no automatic enrollment and instead routes an admin notification. No new columns are read or written beyond those defined in the Data Model and API Changes section; the `interaction` table schema is unchanged.
 
-## §8 Edge Cases
+## Edge Cases
 
 > 🧭 Multi-Selection Routing › Edge Cases
 
@@ -430,7 +430,7 @@ Routing conflict detected — two CareFlows share rank [N]. Please resolve this 
 
 These edge cases read the `workflow` columns `priority_rank`, `always_fire`, and `workflow_active` (plus the partial unique index over `(account_id, priority_rank)`), and the `workflow_to_person_primary` primary leader assignment for the shared-leader case. They create `interaction` records (status `initial`) for every matched CareFlow exactly as the main rules do — no schema beyond the two new `workflow` columns is involved, and the `interaction` table is unchanged.
 
-## §9 What Does Not Change
+## What Does Not Change
 
 > 🧭 Multi-Selection Routing › What Does Not Change
 
@@ -445,11 +445,11 @@ This feature adds two columns to the `workflow` table (`priority_rank`, `always_
 - Catch-all and no-match admin-notification behavior.
 - CareFlow changes do not affect guests already in-flight.
 
-## §10 Reference appendix
+## Reference appendix
 
 > 🧭 Multi-Selection Routing › Reference appendix
 
-This appendix is a consolidated lookup. It introduces no new behavior — every entry restates a fact already established in §1 (Data Model & API Changes) and the rule sections. If anything here appears to disagree with an earlier section, the earlier section governs.
+This appendix is a consolidated lookup. It introduces no new behavior — every entry restates a fact already established in the Data Model and API Changes section and the rule sections. If anything here appears to disagree with an earlier section, the earlier section governs.
 
 ### Data-model recap
 
