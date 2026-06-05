@@ -26,7 +26,7 @@ Every major section opens with a breadcrumb so you always know where you are:
 
 - **🧭** = you are here (top-of-section locator).
 - A checkbox `- [ ]` in Acceptance criteria = a thing a tester (Richard or you) must be able to observe — in the database, a log, or a leader's message thread.
-- **Rule N** sections (Rules 1-4) each describe one routing behavior and reuse the shape above.
+- **Rule N** sections (Rules 1-5) describe the routing and message-generation behaviors and reuse the shape above.
 - **EC-1 .. EC-7** (Edge Cases) are the edge cases — Kenneth-requested; all seven are kept.
 - Code fences are **data only** (a column table or a stored config blob) or a single navigational decision diagram; they never contain code/logic to copy. If you see a fence, it is data or a navigation aid.
 
@@ -91,7 +91,7 @@ The `interaction` table is **unchanged**. No columns are added or altered there.
 
 > 🧭 Multi-Selection Routing › Overview / Mental Model
 
-When a guest submits a connect card, SaltLight decides which leader(s) receive a follow-up assignment based on how many selections the guest made and which active CareFlows those selections match. This section is the mental model for that decision; Rules 1-4 (plus the No-Match and Catch-All fall-through) are the precise implementation of it, and they all depend on the two `workflow` columns defined in the Data Model and API Changes section (`priority_rank`, `always_fire`).
+When a guest submits a connect card, SaltLight decides which leader(s) receive a follow-up assignment based on how many selections the guest made and which active CareFlows those selections match. This section is the mental model for that decision; Rules 1-4 (plus the No-Match and Catch-All fall-through) are the precise routing implementation, and they all depend on the two `workflow` columns defined in the Data Model and API Changes section (`priority_rank`, `always_fire`). Rule 5 covers how the first reply is generated, a change from current behavior.
 
 ### The routing principle
 
@@ -108,7 +108,7 @@ Every leader who receives a guest — regardless of routing path — gets the sa
 - **Message 1 — Guest context (AI-composed):** the first message SaltLight sends to the leader. SaltLight uses AI to write a short, readable summary *about* the incoming guest, drawing on the guest's full name, *every* selection the guest made on the card (not only the one that matched this CareFlow), any prayer request, and any open-field content. It contains, in order: (1) a greeting to the leader by name (from the leader's account record); (2) identification of the new guest thread and the guest's name; (3) the AI summary of what the guest is looking for; (4) a short bridge line telling the leader a suggested reply is coming next. It is written for the leader, about the guest — **not** a raw list of fields, **not** sent to the guest, and **not** the reply (that is Message 2). No options.
 
   *Illustrative only, wording is not prescriptive:* "Hey Richard, this is SaltLight. New thread with Sally Lou. Here's what she's looking for: she asked for prayer and is interested in baptism. A suggested reply is on its way."
-- **Message 2 — AI-generated suggested reply + options:** the AI synthesizes a reply from the full guest context (all selections + prayer request + open-field), written in the leader's voice and generated fresh — never pulled verbatim from the CareFlow template. Options, in this exact order and wording:
+- **Message 2 — AI-generated suggested reply + options:** the AI synthesizes a reply from the full guest context (all selections + prayer request + open-field), written in the leader's voice and generated fresh from the guest context, shaped by the CareFlow's tone example but never sent verbatim (see Rule 5). Options, in this exact order and wording:
   - `SEND` — deliver the draft as-is.
   - `NO` — redraft.
   - `@` — write your own message (sent directly to the guest).
@@ -188,7 +188,7 @@ As a church leader, when a guest submits a connect card with one selection that 
 - [ ] One `interaction` record is created for the matched CareFlow (status: `initial`).
 - [ ] The leader receives Message 1 and Message 2 as two separate messages (never combined).
 - [ ] Message 1 is an AI-composed summary about the guest — a readable summary, not a raw list — drawing on the guest's full name, the selection made, the prayer request (if any), and open-field content (if any).
-- [ ] Message 2 includes an AI-generated reply — not the verbatim CareFlow template — and the options `SEND` / `NO` / `@`.
+- [ ] Message 2 includes an AI-generated reply — not a verbatim template (see Rule 5) — and the options `SEND` / `NO` / `@`.
 
 ### What the backend touches
 
@@ -334,6 +334,46 @@ As a guest who checks multiple boxes on a connect card, I want to receive follow
 
 Reads the `workflow_to_person_primary` leader assignment for each matched CareFlow to group by primary leader, and reads `priority_rank` to identify the winner whose CareFlow serves as the primary voice reference for the combined Message 2. Writes one `interaction` record (status `initial`) per matched CareFlow — deduplication suppresses duplicate message sequences only, never the `interaction` records.
 
+## Rule 5 — AI-Generated First Reply (change from current behavior)
+
+> 🧭 Multi-Selection Routing › Rule 5 — AI-Generated First Reply
+
+### The Rule
+
+This rule changes how the first reply to a guest is produced, so it is called out explicitly. **Today**, the system sends the message stored in the CareFlow's Step 2 field as a pre-programmed template — the same wording for every guest. **Going forward**, the AI generates every first reply (Message 2) from the guest's connect-card context.
+
+The Step 2 field is no longer the literal message. It becomes an **optional tone example**: the leader shows how a reply for that CareFlow should generally sound. The AI uses that example for voice and tone only — it is never sent verbatim. If no tone example is configured, the AI still generates a reply from the guest's context.
+
+The leader always reviews the draft and can change it (`SEND` / `NO` / `@`). No reply is ever sent to the guest without the leader's approval.
+
+### User Story
+
+As a church leader, I want SaltLight to draft each first reply from the guest's actual connect-card context in my tone — instead of sending one pre-written template to everyone — so each guest gets a relevant, personal message that still sounds like me, and I approve it before it sends.
+
+### User Journey
+
+1. The leader sets up a CareFlow. Step 2 no longer asks for the exact first message; it asks for an optional tone example — "Show us how you would reply to someone who, for example, accepted Jesus or was baptized." This represents the leader's voice; it is not the message that gets sent.
+2. A guest submits a connect card with one or more selections, plus any prayer request or open-field content.
+3. Routing (Rules 1-4) picks the leader(s) who receive the guest.
+4. The AI generates Message 2 from the guest's selections, prayer request, and open-field content, shaped by the CareFlow's tone example (style only, never verbatim).
+5. The leader receives Message 1 (the AI guest-context summary), then Message 2 (the AI-drafted reply).
+6. The leader sends it (`SEND`), asks for a redraft (`NO`), or writes their own (`@`). Nothing reaches the guest until the leader acts.
+
+### Acceptance Criteria
+
+- [ ] The first reply (Message 2) is AI-generated for every guest, from the guest's connect-card context — not the verbatim CareFlow field.
+- [ ] The Step 2 CareFlow field is an **optional tone example**, used only to shape voice and tone; it is never sent to the guest verbatim.
+- [ ] If no tone example is configured, the AI still generates a reply from the guest's context.
+- [ ] The AI draft incorporates the guest's selections, prayer request (if any), and open-field content (if any).
+- [ ] The leader can `SEND`, `NO` (redraft), or `@` (write their own); no reply is sent to the guest without the leader's approval.
+- [ ] This **replaces** the prior behavior, where the CareFlow stored a pre-programmed message that was sent as the first message.
+
+### What the backend touches
+
+- **Reads** the CareFlow's tone-example field (in `workflow_data`) and the guest's connect-card context (selections, prayer request, open-field).
+- **Generates** Message 2 via AI; sends nothing to the guest without a leader `SEND` / `@`.
+- **Change note for Kenneth:** this alters the existing first-message source. Today the first message is the pre-programmed CareFlow template; under this rule it is AI-generated, and the Step 2 field is repurposed as a tone example. The Step 2 UI copy and field semantics change accordingly — the full editor change lives in the CareFlow editor spec; this rule defines the message behavior that depends on it.
+
 ## No-Match and Catch-All
 
 > 🧭 Multi-Selection Routing › No-Match and Catch-All
@@ -441,7 +481,7 @@ These edge cases read the `workflow` columns `priority_rank`, `always_fire`, and
 This feature adds two columns to the `workflow` table (`priority_rank`, `always_fire`) and a priority-resolution layer on top of routing. It does not alter any of the existing behavior listed below. If a change here appears to touch one of these, that is a bug.
 
 - Two-message sequence **format** — Message 1 = AI-composed guest-context summary (no suggested reply, no options); Message 2 = AI-generated reply + `SEND` / `NO` / `@`.
-- CareFlow configuration (the 6-step editor).
+- CareFlow configuration (the 6-step editor) — structurally unchanged, with one exception: Step 2's message field becomes an optional tone example (see Rule 5).
 - CareFlow timing, reminders, fallback escalation, and handoffs.
 - The `interaction` table schema — unchanged. No columns are added or altered on `interaction`.
 - The two new columns (`priority_rank`, `always_fire`) are added **only** to the `workflow` table; no other table changes.
@@ -488,8 +528,9 @@ One additional defensive error string is emitted by the routing path itself (see
 - **Always-fire flag** (`always_fire`) — A boolean on a CareFlow. When TRUE, the CareFlow fires alongside the priority winner whenever its selection matches on a multi-selection card, regardless of rank. If the always-fire CareFlow is also the winner, it fires once (the flag adds nothing extra). Always-fire CareFlows whose selections did not match do not fire.
 - **Catch-all CareFlow** — The CareFlow a guest is silently enrolled in when no active CareFlow matches any selection. When configured, the two-message sequence fires for it. When no catch-all is configured and nothing matches, the admin is notified with SaltLight's proposed action instead.
 - **Interaction record** — A row in the `interaction` table (status `initial`) created for every matched CareFlow that fires. One per matched CareFlow — including each always-fire CareFlow that fires and each CareFlow under a deduped leader. Deduplication reduces leader messages, never interaction records.
-- **Two-message sequence** — The universal pair of messages a routed leader receives. Message 1 is an AI-composed context summary about the guest, written for the leader: the AI draws on the guest's full name, every selection they made, any prayer request, and any open-field content, and writes a short, digestible summary so the leader understands who the guest is. Message 1 greets the leader by name, identifies the new guest thread, gives that summary, and ends with a brief bridge line that a suggested reply follows. It is not a raw list of fields, it is not sent to the guest, and it is not the reply. It carries no suggested reply and no options. Message 2 is the AI-generated suggested reply written in the leader's voice, synthesized fresh from the full guest context, with options in this exact order and wording: `SEND` / `NO` / `@` (`SEND` = deliver as-is, `NO` = redraft, `@` = write your own, sent directly to the guest).
+- **Two-message sequence** — The universal pair of messages a routed leader receives. Message 1 is an AI-composed context summary about the guest, written for the leader: the AI draws on the guest's full name, every selection they made, any prayer request, and any open-field content, and writes a short, digestible summary so the leader understands who the guest is. Message 1 greets the leader by name, identifies the new guest thread, gives that summary, and ends with a brief bridge line that a suggested reply follows. It is not a raw list of fields, it is not sent to the guest, and it is not the reply. It carries no suggested reply and no options. Message 2 is the AI-generated suggested reply written in the leader's voice, synthesized fresh from the full guest context and shaped by the CareFlow's tone example (never verbatim; see Rule 5), with options in this exact order and wording: `SEND` / `NO` / `@` (`SEND` = deliver as-is, `NO` = redraft, `@` = write your own, sent directly to the guest).
 - **Primary leader** (`workflow_to_person_primary`) — The primary leader assignment on a CareFlow, configured in the 6-step editor. It is the deduplication key in Rule 4: a leader assigned to two or more matched CareFlows receives exactly one two-message sequence.
+- **Tone example** — An optional sample reply the leader writes in the CareFlow's Step 2 field, showing how a reply for that CareFlow should generally sound. The AI uses it for voice and tone only; it is never sent to the guest verbatim. See Rule 5.
 
 ### Related specs
 
@@ -510,6 +551,7 @@ Which table and column each rule reads or writes. Routing is read-mostly: it rea
 | Rule 3 — Always-Fire Flag | `workflow.always_fire`, `workflow.priority_rank`, `workflow.workflow_data` | One `interaction` per always-fire CareFlow that fires |
 | Rule 4 — Leader Deduplication | `workflow_to_person_primary` (dedup key), `workflow.priority_rank` (identifies winner for the combined Message 2 voice reference) | One `interaction` per matched CareFlow (records always created; only leader messages are deduped) |
 | No-Match / Catch-All | `workflow` (no active match found) | One `interaction` for the catch-all when configured; otherwise admin notification (no `interaction`) |
+| Rule 5 — AI-Generated First Reply | CareFlow tone example (`workflow_data`); guest connect-card context | Nothing sent to the guest without leader `SEND` / `@` |
 | Activation / rank edit | `workflow.priority_rank`, `workflow.workflow_active` (validation + partial unique index) | `workflow.priority_rank`, `workflow.always_fire` via `POST` / `PUT /workflow` |
 
 The `interaction` table schema is unchanged — only the row creations described above use it.
